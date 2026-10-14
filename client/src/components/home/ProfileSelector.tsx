@@ -1,4 +1,7 @@
+import { useMemo } from "react"
 import { useLocation } from "wouter"
+import { useHomeSectionPlacements } from "@/hooks/useHomeSectionPlacements"
+import { CardMedia, homeMediaAlt } from "@/components/home/CardMedia"
 
 const PROFILES = [
   {
@@ -59,6 +62,30 @@ const PROFILES = [
 
 export function ProfileSelector() {
   const [, navigate] = useLocation()
+  const { placements } = useHomeSectionPlacements("escolhas")
+
+  const cards = useMemo(() => {
+    if (!placements.length) {
+      return PROFILES.map((p) => ({
+        ...p,
+        badge: null as string | null,
+        image: null as string | null,
+        href: `/experiencias?perfil=${p.id}`,
+      }))
+    }
+    return placements.map((row, index) => {
+      const base = PROFILES.find((p) => p.id === row.entityId) ?? PROFILES[index % PROFILES.length]
+      return {
+        ...base,
+        id: row.entityId,
+        title: row.titleOverride || base.title,
+        description: row.subtitleOverride || base.description,
+        badge: row.badgeText || null,
+        image: row.imageUrl || null,
+        href: row.ctaHref || `/experiencias?perfil=${encodeURIComponent(row.entityId)}`,
+      }
+    })
+  }, [placements])
 
   return (
     <section
@@ -95,11 +122,11 @@ export function ProfileSelector() {
         }}
           className="profile-grid"
         >
-          {PROFILES.map(p => (
+          {cards.map(p => (
             <button
               key={p.id}
               data-testid={`profile-card-${p.id}`}
-              onClick={() => navigate(`/ingressos?perfil=${p.id}`)}
+              onClick={() => navigate(p.href)}
               style={{
                 background: p.bg,
                 border: `1.5px solid ${p.border}`,
@@ -119,7 +146,28 @@ export function ProfileSelector() {
                 e.currentTarget.style.boxShadow = ""
               }}
             >
-              <span style={{ fontSize: 32 }}>{p.emoji}</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                {p.image ? (
+                  <div style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
+                    <CardMedia
+                      src={p.image}
+                      alt={homeMediaAlt(p.title, p.description)}
+                      width={80}
+                      height={80}
+                    />
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 32 }}>{p.emoji}</span>
+                )}
+                {p.badge ? (
+                  <span style={{
+                    background: `${p.color}18`, color: p.color,
+                    fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 12,
+                  }}>
+                    {p.badge}
+                  </span>
+                ) : null}
+              </div>
               <div style={{ fontSize: 15, fontWeight: 800, color: p.color }}>{p.title}</div>
               <div style={{ fontSize: 13, color: "#4B5563", lineHeight: 1.5 }}>{p.description}</div>
               <div style={{

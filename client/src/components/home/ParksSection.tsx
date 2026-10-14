@@ -1,4 +1,7 @@
+import { useMemo } from "react"
 import { useLocation } from "wouter"
+import { useHomeSectionPlacements } from "@/hooks/useHomeSectionPlacements"
+import { CardMedia, homeMediaAlt } from "@/components/home/CardMedia"
 
 const PARKS = [
   {
@@ -49,6 +52,30 @@ const PARKS = [
 
 export function ParksSection() {
   const [, navigate] = useLocation()
+  const { placements } = useHomeSectionPlacements("destinos")
+
+  const cards = useMemo(() => {
+    if (!placements.length) {
+      return PARKS.map((park) => ({
+        ...park,
+        href: `/parques?parque=${park.id}&destino=${park.destino}`,
+      }))
+    }
+    return placements.map((row, index) => {
+      const base = PARKS.find((p) => p.id === row.entityId) ?? PARKS[index % PARKS.length]
+      return {
+        ...base,
+        id: row.entityId,
+        name: row.titleOverride || base.name,
+        description: row.subtitleOverride || base.description,
+        seal: row.badgeText || base.seal,
+        image: row.imageUrl || base.image,
+        href:
+          row.ctaHref ||
+          `/parques?parque=${encodeURIComponent(row.entityId)}&destino=${base.destino}`,
+      }
+    })
+  }, [placements])
 
   return (
     <section
@@ -82,7 +109,7 @@ export function ParksSection() {
         }}
           className="parks-grid"
         >
-          {PARKS.map(park => (
+          {cards.map(park => (
             <div
               key={park.id}
               data-testid={`park-card-${park.id}`}
@@ -105,11 +132,11 @@ export function ParksSection() {
               }}
             >
               <div style={{ position: "relative", height: 180, overflow: "hidden" }}>
-                <img
+                <CardMedia
                   src={park.image}
-                  alt={park.name}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  onError={e => { (e.target as HTMLImageElement).src = "/images/water-park.jpeg" }}
+                  alt={homeMediaAlt(park.name, park.description)}
+                  width={1200}
+                  height={675}
                 />
                 <div style={{
                   position: "absolute", top: 12, left: 12,
@@ -135,7 +162,7 @@ export function ParksSection() {
                 </div>
                 <button
                   data-testid={`park-card-cta-${park.id}`}
-                  onClick={() => navigate(`/ingressos?destino=${park.destino}`)}
+                  onClick={() => navigate(park.href)}
                   style={{
                     marginTop: 8,
                     width: "100%", padding: "11px 0",

@@ -1,5 +1,8 @@
+import { useMemo } from "react"
 import { useLocation } from "wouter"
 import { Users, Calendar, Building } from "lucide-react"
+import { useHomeSectionPlacements } from "@/hooks/useHomeSectionPlacements"
+import { CardMedia, homeMediaAlt } from "@/components/home/CardMedia"
 
 const COMBOS = [
   {
@@ -13,7 +16,7 @@ const COMBOS = [
     highlight: false,
   },
   {
-    id: "semana",
+    id: "destaque",
     icon: Calendar,
     title: "Combo Semana Completa",
     description: "Mais economia para quem vai aproveitar vários dias. 3 parques em dias diferentes.",
@@ -23,7 +26,7 @@ const COMBOS = [
     highlight: true,
   },
   {
-    id: "combo",
+    id: "para-voce",
     icon: Building,
     title: "Combo Parque + Hotel",
     description: "Perfeito para quem quer resolver tudo em um só lugar. Parque + 1 noite em hotel 4★.",
@@ -36,6 +39,29 @@ const COMBOS = [
 
 export function CombosSection() {
   const [, navigate] = useLocation()
+  const { placements } = useHomeSectionPlacements("ofertas")
+
+  const cards = useMemo(() => {
+    if (!placements.length) {
+      return COMBOS.map((combo) => ({
+        ...combo,
+        imageUrl: null as string | null,
+        href: `/ofertas?combo=${combo.id}`,
+      }))
+    }
+    return placements.map((row, index) => {
+      const base = COMBOS.find((c) => c.id === row.entityId) ?? COMBOS[index % COMBOS.length]
+      return {
+        ...base,
+        id: row.entityId,
+        title: row.titleOverride || base.title,
+        description: row.subtitleOverride || base.description,
+        badge: row.badgeText || base.badge,
+        imageUrl: row.imageUrl || null,
+        href: row.ctaHref || `/ofertas?combo=${encodeURIComponent(row.entityId)}`,
+      }
+    })
+  }, [placements])
 
   return (
     <section
@@ -72,7 +98,7 @@ export function CombosSection() {
         }}
           className="combos-grid"
         >
-          {COMBOS.map(combo => (
+          {cards.map(combo => (
             <div
               key={combo.id}
               data-testid={`combo-card-${combo.id}`}
@@ -108,11 +134,21 @@ export function CombosSection() {
                   width: 44, height: 44, borderRadius: 12,
                   background: combo.highlight ? "rgba(255,255,255,0.2)" : `${combo.badgeColor}15`,
                   display: "flex", alignItems: "center", justifyContent: "center",
+                  overflow: "hidden",
                 }}>
-                  <combo.icon style={{
-                    width: 20, height: 20,
-                    color: combo.highlight ? "#fff" : combo.badgeColor,
-                  }} />
+                  {combo.imageUrl ? (
+                    <CardMedia
+                      src={combo.imageUrl}
+                      alt={homeMediaAlt(combo.title, combo.description)}
+                      width={88}
+                      height={88}
+                    />
+                  ) : (
+                    <combo.icon style={{
+                      width: 20, height: 20,
+                      color: combo.highlight ? "#fff" : combo.badgeColor,
+                    }} />
+                  )}
                 </div>
                 <span style={{
                   background: combo.highlight ? "rgba(255,255,255,0.20)" : `${combo.badgeColor}15`,
@@ -147,7 +183,7 @@ export function CombosSection() {
               </div>
               <button
                 data-testid={`combo-card-cta-${combo.id}`}
-                onClick={() => navigate("/ingressos?perfil=combo")}
+                onClick={() => navigate(combo.href)}
                 style={{
                   marginTop: 4,
                   width: "100%", padding: "13px 0",

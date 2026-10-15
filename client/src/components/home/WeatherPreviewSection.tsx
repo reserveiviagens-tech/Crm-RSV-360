@@ -1,7 +1,20 @@
 import { Link } from "wouter"
 import { WeatherCard } from "@/components/WeatherCard"
+import { useHomeSectionPlacements } from "@/hooks/useHomeSectionPlacements"
+import { CardMedia, homeMediaAlt, isVideoUrl } from "@/components/home/CardMedia"
 
 export function WeatherPreviewSection() {
+  const { placements } = useHomeSectionPlacements("tempo")
+  const placement = placements[0]
+  const ctaHref = placement?.ctaHref || "/previsao"
+  const ctaLabel = placement?.titleOverride || "Escolher minha data"
+  const bannerTitle =
+    placement?.subtitleOverride ||
+    "🗓️ Semana com bom tempo previsto para parques ao ar livre"
+  const bannerBadge = placement?.badgeText || null
+  const bannerImage = placement?.imageUrl || null
+  const bannerIsVideo = isVideoUrl(bannerImage)
+
   return (
     <section
       data-testid="landing-weather-preview"
@@ -64,32 +77,58 @@ export function WeatherPreviewSection() {
         </div>
 
         <div style={{
-          background: "linear-gradient(135deg, #EFF6FF, #F0F9FF)",
+          position: "relative",
+          overflow: "hidden",
+          background: bannerImage && !bannerIsVideo
+            ? `linear-gradient(135deg, rgba(239,246,255,0.92), rgba(240,249,255,0.92)), url(${bannerImage}) center/cover`
+            : "linear-gradient(135deg, #EFF6FF, #F0F9FF)",
           border: "1.5px solid #BFDBFE",
           borderRadius: 16,
           padding: "20px 24px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexWrap: "wrap", gap: 16,
         }}>
-          <div>
+          {bannerIsVideo && bannerImage ? (
+            <CardMedia
+              src={bannerImage}
+              alt={homeMediaAlt(ctaLabel, bannerTitle)}
+              width={1600}
+              height={900}
+              fill
+              opacity={0.18}
+            />
+          ) : null}
+          <div style={{ position: "relative", zIndex: 1 }}>
+            {bannerBadge ? (
+              <span style={{
+                display: "inline-block",
+                background: "#DBEAFE", color: "#1E40AF",
+                fontSize: 11, fontWeight: 800, padding: "3px 10px",
+                borderRadius: 12, marginBottom: 8,
+              }}>
+                {bannerBadge}
+              </span>
+            ) : null}
             <div style={{ fontSize: 15, fontWeight: 800, color: "#1E3A5F", marginBottom: 4 }}>
-              🗓️ Semana com bom tempo previsto para parques ao ar livre
+              {bannerTitle}
             </div>
             <div style={{ fontSize: 13, color: "#4B5563" }}>
               Aproveite para planejar sua visita e garantir seu ingresso com desconto.
             </div>
           </div>
-          <Link href="/ingressos">
+          <Link href={ctaHref}>
             <button
               data-testid="weather-cta-btn"
               style={{
+                position: "relative",
+                zIndex: 1,
                 padding: "12px 24px", borderRadius: 10,
                 background: "linear-gradient(135deg, #2563EB, #1E40AF)",
                 color: "#fff", fontWeight: 700, fontSize: 14,
                 border: "none", cursor: "pointer", whiteSpace: "nowrap",
               }}
             >
-              Escolher minha data
+              {ctaLabel}
             </button>
           </Link>
         </div>

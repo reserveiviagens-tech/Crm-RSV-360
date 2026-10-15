@@ -1,4 +1,4 @@
-export type HomeSectionId = "escolhas" | "destinos" | "ofertas" | "tempo"
+export type HomeSectionId = "hero" | "escolhas" | "destinos" | "ofertas" | "tempo"
 
 export type HomeSectionPlacement = {
   id: number

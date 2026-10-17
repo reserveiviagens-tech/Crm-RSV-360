@@ -344,7 +344,21 @@ export function CrossSellSection({ title, items }: {
           transition: slideTransition ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : "none",
         }}>
         {[...items, items[0]].filter(Boolean).map((item, i) => (
-          <a key={i} href={item.link} style={{
+          <a
+            key={i}
+            href={item.link}
+            onClick={() => {
+              // Fase 12 — cross-sell tracking (hotel vs oferta genérica)
+              const isHotel = item.link.includes("/hoteis")
+              void import("@/lib/analytics").then(({ trackEvent }) => {
+                trackEvent(isHotel ? "related_hotel_click" : "related_offer_click", {
+                  name: item.name,
+                  link: item.link,
+                  price: item.price,
+                })
+              })
+            }}
+            style={{
             minWidth: 140, background: "#fff", borderRadius: 12,
             overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
             textDecoration: "none", flexShrink: 0,

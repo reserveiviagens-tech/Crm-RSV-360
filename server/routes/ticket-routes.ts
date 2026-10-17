@@ -71,6 +71,52 @@ export function registerTicketRoutes(
         .json({ message: "Dados do cliente são obrigatórios" });
     }
 
+    const {
+      normalizeIdempotencyKey,
+      fingerprintTicketCreatePayload,
+      lookupIdempotentPayment,
+      storeIdempotentPayment,
+    } = await import("../services/payment-idempotency.service.js");
+
+    const rawIdem =
+      req.headers["idempotency-key"] ?? req.headers["Idempotency-Key"];
+    const idemKey = normalizeIdempotencyKey(
+      Array.isArray(rawIdem) ? rawIdem[0] : rawIdem
+    );
+    if (rawIdem != null && rawIdem !== "" && !idemKey) {
+      return res.status(400).json({
+        message: "Idempotency-Key inválida (use 1–128 chars: A-Z a-z 0-9 . _ : -)",
+        code: "INVALID_IDEMPOTENCY_KEY",
+      });
+    }
+
+    const fingerprint = fingerprintTicketCreatePayload({
+      items: items.map((i) => ({
+        ticketId: i.ticketId as string,
+        quantity: Math.floor(i.quantity as number),
+      })),
+      customer: {
+        name: customer.name,
+        email: customer.email,
+        cpf: customer.cpf,
+        phone: customer.phone,
+      },
+    });
+
+    if (idemKey) {
+      const lookup = lookupIdempotentPayment(idemKey, fingerprint);
+      if (lookup.kind === "hit") {
+        res.setHeader("Idempotent-Replay", "true");
+        return res.status(lookup.record.statusCode).json(lookup.record.body);
+      }
+      if (lookup.kind === "conflict") {
+        return res.status(409).json({
+          message: "Idempotency-Key já usada com payload diferente",
+          code: "IDEMPOTENCY_KEY_REUSE",
+        });
+      }
+    }
+
     try {
       const lineItems = items.map((i) => ({
         ticketId: i.ticketId as string,
@@ -100,6 +146,7 @@ export function registerTicketRoutes(
         totalAmount: result.totalAmount,
         demo: result.demo,
         voucherId,
+        idempotencyKey: idemKey ?? undefined,
       });
 
       if (result.demo) {
@@ -109,7 +156,7 @@ export function registerTicketRoutes(
         });
       }
 
-      return res.status(201).json({
+      const responseBody = {
         transactionId: result.transactionId,
         status: result.status,
         qrCodeBase64: result.qrCodeBase64,
@@ -124,7 +171,11 @@ export function registerTicketRoutes(
         demo: result.demo,
         voucherId,
         voucherToken,
-      });
+      };
+      if (idemKey) {
+        storeIdempotentPayment(idemKey, fingerprint, 201, responseBody, result.transactionId);
+      }
+      return res.status(201).json(responseBody);
     } catch (err) {
       if (err instanceof UnknownTicketError) {
         return res.status(422).json({ message: err.message });
@@ -275,15 +326,30 @@ export function registerTicketRoutes(
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { transactionId, status } = req.body as {
+    const { transactionId, status, eventId } = req.body as {
       transactionId?: string;
       status?: string;
+      eventId?: string;
     };
 
     if (!transactionId || !status) {
       return res
         .status(400)
         .json({ message: "transactionId e status são obrigatórios" });
+    }
+
+    const { buildWebhookEventKey, claimWebhookEvent } = await import(
+      "../services/webhook-idempotency.service.js"
+    );
+    const eventKey = buildWebhookEventKey({ eventId, transactionId, status });
+    const claim = claimWebhookEvent(eventKey);
+    if (!claim.isNew) {
+      logger.info("[webhooks/tickets] Evento duplicado ignorado", {
+        eventKey,
+        transactionId,
+        status,
+      });
+      return res.status(200).json({ received: true, duplicate: true, eventKey });
     }
 
     const txn = ticketTransactions.get(transactionId);
@@ -332,6 +398,6 @@ export function registerTicketRoutes(
       }
     }
 
-    return res.status(200).json({ received: true });
+    return res.status(200).json({ received: true, duplicate: false, eventKey });
   });
 }

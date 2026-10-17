@@ -344,30 +344,34 @@ export function TicketRowCard({
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
             <button
+              type="button"
+              className="rsv-hit-44-inline"
               data-testid={`button-saiba-mais-${ticket.id}`}
               onClick={() => setExpanded(e => !e)}
               style={{
-                background: "none", border: "none", padding: 0, cursor: "pointer",
+                background: "none", border: "none", padding: "10px 8px", cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 3,
-                fontSize: 11, fontWeight: 600, color: "#0891B2",
+                fontSize: 12, fontWeight: 600, color: "#0891B2",
               }}
             >
-              <Info style={{ width: 11, height: 11 }} />
+              <Info style={{ width: 14, height: 14 }} />
               {expanded ? "Ver menos" : "Saiba mais"}
               {expanded
-                ? <ChevronUp style={{ width: 11, height: 11 }} />
-                : <ChevronRight style={{ width: 11, height: 11 }} />}
+                ? <ChevronUp style={{ width: 14, height: 14 }} />
+                : <ChevronRight style={{ width: 14, height: 14 }} />}
             </button>
             {PARK_DETAILS[ticket.id] && (
               <button
+                type="button"
+                className="rsv-hit-44-inline"
                 data-testid={`button-detalhes-${ticket.id}`}
                 onClick={() => setShowDetails(d => !d)}
                 style={{
                   background: showDetails ? "#EFF6FF" : "none",
                   border: `1px solid ${showDetails ? "#BFDBFE" : "#E5E7EB"}`,
-                  padding: "2px 8px", borderRadius: 5, cursor: "pointer",
+                  padding: "10px 12px", borderRadius: 8, cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 3,
-                  fontSize: 11, fontWeight: 600, color: showDetails ? "#1D4ED8" : "#6B7280",
+                  fontSize: 12, fontWeight: 600, color: showDetails ? "#1D4ED8" : "#6B7280",
                   transition: "all 0.15s",
                 }}
               >
@@ -408,10 +412,13 @@ export function TicketRowCard({
             <div>
               {qty === 0 ? (
                 <button
+                  type="button"
+                  className="rsv-hit-44-inline"
                   data-testid={`button-buy-${ticket.id}`}
                   onClick={() => onBuy(ticket)}
                   style={{
-                    padding: "10px 18px", border: "none", borderRadius: 10,
+                    padding: "12px 18px", border: "none", borderRadius: 10,
+                    minHeight: 44,
                     background: cabana
                       ? "linear-gradient(135deg, #16A34A, #15803D)"
                       : ticket.popular
@@ -431,20 +438,22 @@ export function TicketRowCard({
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     border: "2px solid #22C55E", borderRadius: 10,
-                    background: "#F0FDF4", padding: "6px 10px",
+                    background: "#F0FDF4", padding: "4px 8px",
+                    minHeight: 44,
                   }}
                 >
                   <button
+                    type="button"
+                    className="rsv-stepper-btn"
                     data-testid={`button-decrease-${ticket.id}`}
                     onClick={() => onDec(ticket, qty)}
                     style={{
-                      width: 28, height: 28, border: "none", borderRadius: 6,
+                      borderRadius: 8,
                       background: qty === 1 ? "#FEE2E2" : "#DCFCE7",
                       color: qty === 1 ? "#EF4444" : "#16A34A",
-                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                     }}
                   >
-                    {qty === 1 ? <Trash2 style={{ width: 12, height: 12 }} /> : <Minus style={{ width: 12, height: 12 }} />}
+                    {qty === 1 ? <Trash2 style={{ width: 15, height: 15 }} /> : <Minus style={{ width: 15, height: 15 }} />}
                   </button>
                   <span
                     style={{ fontSize: 13, fontWeight: 800, color: "#16A34A", minWidth: 40, textAlign: "center" }}
@@ -453,15 +462,16 @@ export function TicketRowCard({
                     {qty}x
                   </span>
                   <button
+                    type="button"
+                    className="rsv-stepper-btn"
                     data-testid={`button-increase-${ticket.id}`}
                     onClick={() => onInc(ticket, qty)}
                     style={{
-                      width: 28, height: 28, border: "none", borderRadius: 6,
+                      borderRadius: 8,
                       background: "#DCFCE7", color: "#16A34A",
-                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                     }}
                   >
-                    <Plus style={{ width: 12, height: 12 }} />
+                    <Plus style={{ width: 15, height: 15 }} />
                   </button>
                 </div>
               )}
@@ -509,13 +519,24 @@ export function TicketGridCard({
         transition: "box-shadow 0.2s",
       }}
     >
-      {ticket.image && (
-        <img
-          src={ticket.image}
-          alt={ticket.name}
-          style={{ width: "100%", height: 120, objectFit: "cover" }}
-        />
-      )}
+      <div
+        className="relative h-[120px] bg-gradient-to-br from-blue-900 to-slate-800 overflow-hidden flex items-center justify-center"
+        style={{ width: "100%" }}
+      >
+        {ticket.image ? (
+          <img
+            src={ticket.image}
+            alt={ticket.name}
+            style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none"
+            }}
+          />
+        ) : null}
+        <span className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase shadow z-[1]">
+          {ticket.popular ? "Popular" : `-${ticket.discount}%`}
+        </span>
+      </div>
       <div style={{ padding: "12px 14px", flex: 1, display: "flex", flexDirection: "column" }}>
         {ticket.popular && (
           <span style={{
@@ -652,15 +673,16 @@ export function TicketGridCard({
                 data-testid={`button-buy-${ticket.id}`}
                 onClick={() => onBuy(ticket)}
                 style={{
-                  width: "100%", padding: "9px 0", border: "none", borderRadius: 9,
+                  width: "100%", padding: "12px 0", border: "none", borderRadius: 9,
+                  minHeight: 44,
                   background: cabana
                     ? "linear-gradient(135deg, #16A34A, #15803D)"
                     : "linear-gradient(135deg, #0891B2, #2563EB)",
-                  color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer",
+                  color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 }}
               >
-                <ShoppingCart style={{ width: 13, height: 13 }} />
+                <ShoppingCart style={{ width: 15, height: 15 }} />
                 Reservar
               </button>
             ) : (
@@ -668,20 +690,22 @@ export function TicketGridCard({
                 data-testid={`stepper-${ticket.id}`}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  border: "2px solid #22C55E", borderRadius: 9, background: "#F0FDF4", padding: "6px 8px",
+                  border: "2px solid #22C55E", borderRadius: 9, background: "#F0FDF4", padding: "4px 6px",
+                  minHeight: 44,
                 }}
               >
                 <button
+                  type="button"
+                  className="rsv-stepper-btn"
                   data-testid={`button-decrease-${ticket.id}`}
                   onClick={() => onDec(ticket, qty)}
                   style={{
-                    width: 26, height: 26, border: "none", borderRadius: 5,
+                    borderRadius: 8,
                     background: qty === 1 ? "#FEE2E2" : "#DCFCE7",
                     color: qty === 1 ? "#EF4444" : "#16A34A",
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
-                  {qty === 1 ? <Trash2 style={{ width: 11, height: 11 }} /> : <Minus style={{ width: 11, height: 11 }} />}
+                  {qty === 1 ? <Trash2 style={{ width: 15, height: 15 }} /> : <Minus style={{ width: 15, height: 15 }} />}
                 </button>
                 <span
                   style={{ fontSize: 13, fontWeight: 800, color: "#16A34A" }}
@@ -690,15 +714,16 @@ export function TicketGridCard({
                   {qty}x
                 </span>
                 <button
+                  type="button"
+                  className="rsv-stepper-btn"
                   data-testid={`button-increase-${ticket.id}`}
                   onClick={() => onInc(ticket, qty)}
                   style={{
-                    width: 26, height: 26, border: "none", borderRadius: 5,
+                    borderRadius: 8,
                     background: "#DCFCE7", color: "#16A34A",
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
-                  <Plus style={{ width: 11, height: 11 }} />
+                  <Plus style={{ width: 15, height: 15 }} />
                 </button>
               </div>
             )}
@@ -827,8 +852,8 @@ export function CategoryAccordion({
                 {section.grid ? (
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                    gap: 10,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                    gap: 16,
                   }}>
                     {sectionTickets.map((ticket) => (
                       <TicketGridCard

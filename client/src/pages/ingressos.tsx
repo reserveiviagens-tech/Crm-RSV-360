@@ -17,14 +17,14 @@ import { saveSelectedDate, replaceCart, setCheckoutPrefill } from "@/lib/cart-st
 import { QuickDecisionSection } from "@/components/QuickDecisionSection"
 import { MiniWizard } from "@/components/MiniWizard"
 import { TicketsGrid, type TicketItem } from "@/components/TicketsGrid"
-import { CalendarioIngressos, DateBanner, getPriceMultiplier, getDateAvailabilityForTicket } from "@/components/CalendarioIngressos"
+import { DateBanner, getPriceMultiplier, getDateAvailabilityForTicket } from "@/components/CalendarioIngressos"
 import { EnterpriseAccordion } from "@/components/EnterpriseAccordion"
 import { IngressosSidebar } from "@/components/IngressosSidebar"
 import { CartAddModal } from "@/components/CartAddModal"
 import { ComboDatesModal } from "@/components/ComboDatesModal"
 import { CartStickyBar } from "@/components/CartStickyBar"
+import { CompactContextBar } from "@/components/ingressos/CompactContextBar"
 import { DESTINATION_CITIES, ENTERPRISE_CONFIG, type DestinationCity } from "@/lib/enterprises"
-import { WeatherCard } from "@/components/WeatherCard"
 import { useUnifiedSearch } from "@/hooks/useUnifiedSearch"
 import SearchResultsSummary from "@/components/search/SearchResultsSummary"
 import SearchEmptyState from "@/components/search/SearchEmptyState"
@@ -884,13 +884,13 @@ export default function IngressosPage() {
         />
       </div>
       <button
-        className="rsv-catalog-mobile-only"
+        className="rsv-catalog-mobile-only rsv-hit-44-inline"
         data-testid="button-open-filters"
         onClick={() => setFilterDrawerOpen(true)}
         style={{
           display: "flex", alignItems: "center", gap: 5, flexShrink: 0,
           background: "#EFF6FF", border: "1.5px solid #BFDBFE",
-          borderRadius: 999, padding: "7px 12px", color: "#2563EB",
+          borderRadius: 999, padding: "10px 14px", color: "#2563EB",
           fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
         }}
       >
@@ -900,13 +900,10 @@ export default function IngressosPage() {
         categories={[
           ...buildSectionTypeNav("ingressos"),
           CATALOG_DIVIDER,
-          { label: "Todos",      value: "Todos",      icon: LayoutGrid, filterUpdate: {}, testId: "button-filter-todos" },
-          { label: "Parques",    value: "Parques",    icon: Waves,      filterUpdate: {}, testId: "button-filter-parques" },
-          { label: "Natureza",   value: "Natureza",   icon: Leaf,       filterUpdate: {}, testId: "button-filter-natureza" },
-          { label: "Transporte", value: "Transporte", icon: Bus,        filterUpdate: {}, testId: "button-filter-transporte" },
-          { label: "Combos",     value: "Combos",     icon: Gift,       filterUpdate: {}, testId: "button-filter-combos" },
-          { label: "Cabanas",    value: "Cabanas",    icon: Home,       filterUpdate: {}, testId: "button-filter-cabanas" },
-          { label: "Especiais",  value: "Especiais",  icon: Star,       filterUpdate: {}, testId: "button-filter-especiais" },
+          { label: "Todos",   value: "Todos",   icon: LayoutGrid, filterUpdate: {}, testId: "button-filter-todos" },
+          { label: "Parques", value: "Parques", icon: Waves,      filterUpdate: {}, testId: "button-filter-parques" },
+          { label: "Combos",  value: "Combos",  icon: Gift,       filterUpdate: {}, testId: "button-filter-combos" },
+          { label: "Especiais", value: "Especiais", icon: Star,   filterUpdate: {}, testId: "button-filter-especiais" },
         ]}
         activeFilter={activeFilter}
         onSelect={(f) => {
@@ -915,17 +912,61 @@ export default function IngressosPage() {
           trackEvent("ticket_filter_change", { filter: "category_tab", value: f.value })
         }}
       />
+      {/* Hick: categorias secundárias fora do caminho crítico */}
+      <details data-testid="filter-more-categories" style={{ flexShrink: 0, position: "relative" }}>
+        <summary
+          className="rsv-hit-44-inline"
+          style={{
+          listStyle: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
+          color: "#6B7280", padding: "10px 14px", borderRadius: 999,
+          border: "1.5px solid #E5E7EB", background: "#F9FAFB", whiteSpace: "nowrap",
+          display: "inline-flex", alignItems: "center",
+        }}>
+          Mais
+        </summary>
+        <div style={{
+          position: "absolute", marginTop: 6, zIndex: 40, background: "#fff",
+          border: "1px solid #E5E7EB", borderRadius: 12, padding: 8,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: 4,
+          minWidth: 160,
+        }}>
+          {[
+            { label: "Natureza", value: "Natureza", testId: "button-filter-natureza" },
+            { label: "Transporte", value: "Transporte", testId: "button-filter-transporte" },
+            { label: "Cabanas", value: "Cabanas", testId: "button-filter-cabanas" },
+          ].map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              data-testid={f.testId}
+              onClick={() => {
+                setActiveFilter(f.value)
+                trackEvent("ticket_filter_change", { filter: "category_tab", value: f.value })
+              }}
+              style={{
+                textAlign: "left", border: "none", background: activeFilter === f.value ? "#EFF6FF" : "transparent",
+                borderRadius: 8, padding: "10px 12px", fontSize: 13, fontWeight: 600,
+                color: activeFilter === f.value ? "#2563EB" : "#374151", cursor: "pointer", minHeight: 44,
+                width: "100%",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </details>
       <button
         data-testid="button-help-choose"
         onClick={() => setShowWizard(true)}
+        className="rsv-hit-44-inline"
         style={{
           display: "flex", alignItems: "center", gap: 5, flexShrink: 0, marginLeft: "auto",
           background: "#FFF7ED", border: "1.5px solid #FDE68A",
-          borderRadius: 999, padding: "7px 12px", color: "#D97706",
+          borderRadius: 999, padding: "10px 14px", color: "#D97706",
           fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
         }}
       >
-        <Wand2 style={{ width: 12, height: 12 }} />
+        <Wand2 style={{ width: 14, height: 14 }} />
         Me ajude a escolher
       </button>
     </div>
@@ -1077,12 +1118,17 @@ export default function IngressosPage() {
       <div style={{ display: "flex", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
 
-      <SocialProofBanner pageName="ingressos" />
-
       <div style={{ padding: "16px 16px 0" }}>
-        <CalendarioIngressos
+        <CompactContextBar
           selectedDate={selectedDate}
           onDateSelect={handleDateSelect}
+          selectedCity={activeCity}
+          onCityChange={handleCityChange}
+          weatherLabel={
+            activeCity === "caldas-novas"
+              ? "Caldas Novas · 26°C (Ensolarado)"
+              : "Rio Quente · 24°C (Parcialmente nublado)"
+          }
         />
         {selectedDate && (
           <div style={{ marginTop: 10 }}>
@@ -1099,91 +1145,17 @@ export default function IngressosPage() {
         )}
       </div>
 
+      <SocialProofBanner pageName="ingressos" />
       <PersonalizedBanner profile={profile} />
-      <QuickDecisionSection onPick={handleQuickPick} activePick={activePick === "combo" ? null : activePick} />
-
-      <div style={{
-        margin: "16px 16px 0", padding: 20, borderRadius: 16,
-        background: "linear-gradient(135deg, #7C3AED, #DB2877)",
-        color: "#fff", position: "relative", overflow: "hidden",
-      }} data-testid="section-combo-ia">
-        <div style={{
-          position: "absolute", top: -20, right: -20, width: 100, height: 100,
-          borderRadius: "50%", background: "rgba(255,255,255,0.1)",
-        }} />
-        <div style={{
-          position: "absolute", bottom: -30, left: -30, width: 80, height: 80,
-          borderRadius: "50%", background: "rgba(255,255,255,0.05)",
-        }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <Sparkles style={{ width: 20, height: 20, color: "#FDE68A" }} />
-          <span style={{ fontSize: 14, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            Combo IA — Sugestão Inteligente
-          </span>
-        </div>
-        <p style={{ fontSize: 13, margin: "0 0 12px", opacity: 0.9 }}>
-          {profile
-            ? `Baseado no seu perfil, a IA selecionou ${comboTickets.length} combos ideais para você:`
-            : "A IA analisou os parques e sugere a melhor combinação para você:"}
-        </p>
-        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-          {comboTickets.map((t) => (
-            <div key={t.id} style={{
-              flex: 1, minWidth: 100, background: "rgba(255,255,255,0.15)",
-              borderRadius: 10, padding: "10px 12px",
-            }}>
-              <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 4px" }}>{t.name}</p>
-              <span style={{ fontSize: 12, opacity: 0.8 }}>{formatPrice(t.price)}</span>
-              {profile && t.matchScore > 0 && (
-                <div style={{
-                  marginTop: 4, fontSize: 10, fontWeight: 700,
-                  background: "rgba(255,255,255,0.2)", borderRadius: 4,
-                  padding: "2px 6px", display: "inline-block",
-                }}>
-                  {t.matchScore}% match
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14, textDecoration: "line-through", opacity: 0.6 }}>
-            {formatPrice(comboOriginalPrice)}
-          </span>
-          <span style={{ fontSize: 24, fontWeight: 800 }}>
-            {formatPrice(comboDiscountedPrice)}
-          </span>
-          <span style={{
-            background: "#FACC15", color: "#000", fontSize: 11, fontWeight: 800,
-            padding: "3px 8px", borderRadius: 6,
-          }}>
-            -15% IA
-          </span>
-          <span style={{
-            background: "rgba(255,255,255,0.2)", fontSize: 11, fontWeight: 600,
-            padding: "3px 8px", borderRadius: 6,
-          }}>
-            Economia de {formatPrice(comboOriginalPrice - comboDiscountedPrice)}
-          </span>
-        </div>
-        <button
-          data-testid="button-combo-ia-buy"
-          onClick={() =>
-            window.open(
-              `https://wa.me/5564993197555?text=Olá! Quero o Combo IA: ${comboTickets.map(t => t.name).join(" + ")} com 15% de desconto!`,
-              "_blank"
-            )
-          }
-          style={{
-            width: "100%", padding: "13px 0", border: "none", borderRadius: 10,
-            background: "#fff", color: "#7C3AED", fontSize: 15, fontWeight: 800,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          }}
-        >
-          <ShoppingCart style={{ width: 18, height: 18 }} />
-          Quero esse Combo!
-        </button>
-      </div>
+      <QuickDecisionSection
+        onPick={handleQuickPick}
+        onClearPick={() => {
+          setActivePick(null)
+          setSearchFilters({ sort: "relevance", profile: undefined, type: undefined })
+          trackEvent("ticket_filter_change", { filter: "quick_pick", value: "cleared" })
+        }}
+        activePick={activePick === "combo" ? null : activePick}
+      />
 
       {compareIds.length >= 1 && (
         <div style={{
@@ -1236,8 +1208,8 @@ export default function IngressosPage() {
                 <BarChart3 style={{ width: 22, height: 22, color: "#2563EB" }} />
                 Comparar Ingressos
               </h2>
-              <button onClick={() => setShowCompare(false)} data-testid="button-compare-close" style={{
-                width: 32, height: 32, borderRadius: "50%", border: "none",
+              <button onClick={() => setShowCompare(false)} data-testid="button-compare-close" className="rsv-hit-44" style={{
+                width: 44, height: 44, borderRadius: "50%", border: "none",
                 background: "#F3F4F6", cursor: "pointer", display: "flex",
                 alignItems: "center", justifyContent: "center",
               }}>
@@ -1429,18 +1401,6 @@ export default function IngressosPage() {
           })}
         </div>
 
-        {activeCity !== "multi-destino" && (
-          <div style={{ padding: "0 16px", marginBottom: 12 }} data-testid="section-weather">
-            <WeatherCard
-              options={{
-                mode: "city",
-                city: activeCity === "rio-quente" ? "Rio Quente" : "Caldas Novas",
-                country: "BR",
-              }}
-            />
-          </div>
-        )}
-
         {(searchHasActiveFilters || !!searchFilters.q) && (
           <div style={{ padding: "0 16px", marginBottom: 8 }} data-testid="ingressos-search-summary">
             <SearchResultsSummary
@@ -1471,6 +1431,86 @@ export default function IngressosPage() {
             onInc={handleIncrease}
             onDec={handleDecrease}
             priceMultiplier={priceMultiplier}
+            afterFirstEnterprise={
+              <div style={{
+                margin: "6px 0 4px", padding: 20, borderRadius: 16,
+                background: "linear-gradient(135deg, #1E3A8A, #2563EB)",
+                color: "#fff", position: "relative", overflow: "hidden",
+              }} data-testid="section-combo-ia">
+                <div style={{
+                  position: "absolute", top: -20, right: -20, width: 100, height: 100,
+                  borderRadius: "50%", background: "rgba(255,255,255,0.1)",
+                }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <Sparkles style={{ width: 20, height: 20, color: "#FDE68A" }} />
+                  <span style={{ fontSize: 14, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Combo IA — Sugestão Inteligente
+                  </span>
+                </div>
+                <p style={{ fontSize: 13, margin: "0 0 12px", opacity: 0.9 }}>
+                  {profile
+                    ? `Baseado no seu perfil, a IA selecionou ${comboTickets.length} combos ideais para você:`
+                    : "A IA analisou os parques e sugere a melhor combinação para você:"}
+                </p>
+                <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                  {comboTickets.map((t) => (
+                    <div key={t.id} style={{
+                      flex: 1, minWidth: 100, background: "rgba(255,255,255,0.15)",
+                      borderRadius: 10, padding: "10px 12px",
+                    }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 4px" }}>{t.name}</p>
+                      <span style={{ fontSize: 12, opacity: 0.8 }}>{formatPrice(t.price)}</span>
+                      {profile && t.matchScore > 0 && (
+                        <div style={{
+                          marginTop: 4, fontSize: 10, fontWeight: 700,
+                          background: "rgba(255,255,255,0.2)", borderRadius: 4,
+                          padding: "2px 6px", display: "inline-block",
+                        }}>
+                          {t.matchScore}% match
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 14, textDecoration: "line-through", opacity: 0.6 }}>
+                    {formatPrice(comboOriginalPrice)}
+                  </span>
+                  <span style={{ fontSize: 24, fontWeight: 800 }}>
+                    {formatPrice(comboDiscountedPrice)}
+                  </span>
+                  <span style={{
+                    background: "#FACC15", color: "#000", fontSize: 11, fontWeight: 800,
+                    padding: "3px 8px", borderRadius: 6,
+                  }}>
+                    -15% IA
+                  </span>
+                  <span style={{
+                    background: "rgba(255,255,255,0.2)", fontSize: 11, fontWeight: 600,
+                    padding: "3px 8px", borderRadius: 6,
+                  }}>
+                    Economia de {formatPrice(comboOriginalPrice - comboDiscountedPrice)}
+                  </span>
+                </div>
+                <button
+                  data-testid="button-combo-ia-buy"
+                  onClick={() =>
+                    window.open(
+                      `https://wa.me/5564993197555?text=Olá! Quero o Combo IA: ${comboTickets.map(t => t.name).join(" + ")} com 15% de desconto!`,
+                      "_blank"
+                    )
+                  }
+                  style={{
+                    width: "100%", padding: "13px 0", border: "none", borderRadius: 10,
+                    background: "#fff", color: "#1E3A8A", fontSize: 15, fontWeight: 800,
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  <ShoppingCart style={{ width: 18, height: 18 }} />
+                  Quero esse Combo!
+                </button>
+              </div>
+            }
           />
         )}
       </div>
@@ -1534,6 +1574,7 @@ export default function IngressosPage() {
           target="_blank"
           rel="noopener noreferrer"
           data-testid="link-whatsapp-float"
+          onClick={() => trackEvent("ticket_whatsapp_share_click", { source: "float_empty_cart" })}
           style={{
             position: "fixed", bottom: 80, right: 16,
             width: 56, height: 56, background: "#22C55E", borderRadius: "50%",

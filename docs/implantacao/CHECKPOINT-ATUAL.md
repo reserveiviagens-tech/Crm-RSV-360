@@ -1,24 +1,24 @@
 # CHECKPOINT-ATUAL
 
 ## Checkpoint
-- Fase atual: Task 11 — Pipeline CI com check/build/e2e
-- Branch atual: main
-- Base branch: main
-- Commit mais recente: 321b692 — Merge pull request #8 from ReserveiViagens/test/orders-e2e-flow
+- Trilha: Master UI + ops
+- Fase: **16 Plus** — Smart Hub live + Redis oficial + hardening CartStickyBar
+- Data: 2026-10-17
 
-## Última validação
-- npm run check: ✅ OK
-- npm run build: ✅ OK
-- npm run e2e: ✅ 3/3 testes passando
+## Arquivos (desta rodada)
+### rsv360
+- `backend/.env` — `REDIS_DISABLED=false`, `REDIS_ENABLED=true`
+- `docs/ops/REDIS-LOCAL.md`
+- `apps/turismo/src/lib/smart-hub-live.ts`
+- `apps/turismo/src/hooks/useSmartHubLive.ts`
+- `apps/turismo/pages/dashboard/smart-hub.tsx`
+- `apps/turismo/src/components/smart-hub/*`
 
-## O que foi concluído nesta rodada
-- ✅ Task 10: E2E tests para fluxo de pedidos (PENDING→APPROVED, FAILED→retry, EXPIRED→retry)
-- ✅ Task 11: Pipeline CI com check/build/e2e + artefatos Playwright + badge README
-- ✅ Playwright configurado com webServer, cross-env para Windows
-- ✅ 3 cenários E2E validados: carrinho restaurado, prefill buyer data, retry contextual
-- ✅ CI workflow com upload de relatório Playwright (30 dias retenção)
-- ✅ Badge CI no README.md
-- ✅ PR #8 merged com sucesso
+### Crm-RSV-360
+- `client/src/components/CartStickyBar.tsx` — desktop max-width 960
+- `docs/implantacao/02-HANDOFF-ATUAL.md`
+- `docs/implantacao/01-STATUS-GERAL.md`
+- `docs/implantacao/03-CHANGELOG-IMPLEMENTACAO.md`
 
-## Próximo passo exato
-Aguardar definição de próxima task (ex.: Task 12 — Deploy em produção ou Task 12 — Segurança adicional)
+## Próximo
+Smoke desktop Smart Hub + `/ingressos` cart → Fase 15 (Scrapling) quando pedido.

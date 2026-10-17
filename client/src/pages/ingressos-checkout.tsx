@@ -19,8 +19,11 @@ import { MobileCTABar } from "@/components/home/MobileCTABar"
 import { PixQrCodePanel } from "@/components/checkout/PixQrCodePanel"
 import { PixCopyPasteField } from "@/components/checkout/PixCopyPasteField"
 import { PixCountdown } from "@/components/checkout/PixCountdown"
+import { HoldTimerBanner } from "@/components/checkout/HoldTimerBanner"
+import { GoalProgressBar, stageFromCheckoutStep } from "@/components/checkout/GoalProgressBar"
 import { PaymentStatusBanner } from "@/components/checkout/PaymentStatusBanner"
 import { CheckoutSummaryCard } from "@/components/checkout/CheckoutSummaryCard"
+import { useTicketHold } from "@/hooks/useTicketHold"
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(price)
@@ -133,42 +136,55 @@ function useIsDesktop() {
 function ProgressBar({ step }: { step: CheckoutStep }) {
   const stepIndex = STEP_LABELS.findIndex((s) => s.key === step)
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0 4px" }}>
-      {STEP_LABELS.map((s, idx) => {
-        const done = idx < stepIndex
-        const active = idx === stepIndex
-        return (
-          <div key={s.key} style={{ display: "flex", alignItems: "center", flex: idx < STEP_LABELS.length - 1 ? 1 : 0 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: "50%",
-                background: done ? "#22C55E" : active ? "#fff" : "rgba(255,255,255,0.3)",
-                color: done ? "#fff" : active ? "#2563EB" : "rgba(255,255,255,0.6)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 13, fontWeight: 800,
-                border: active ? "none" : done ? "none" : "1.5px solid rgba(255,255,255,0.4)",
-                transition: "all 0.3s",
-              }}>
-                {done ? <Check style={{ width: 16, height: 16 }} /> : idx + 1}
+    <div data-testid="checkout-progress">
+      <div style={{ marginBottom: 14 }}>
+        <GoalProgressBar
+          stage={stageFromCheckoutStep(step)}
+          tone="onDark"
+          testId="checkout-goal-progress"
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0 4px" }}>
+        {STEP_LABELS.map((s, idx) => {
+          const done = idx < stepIndex
+          const active = idx === stepIndex
+          return (
+            <div key={s.key} style={{ display: "flex", alignItems: "center", flex: idx < STEP_LABELS.length - 1 ? 1 : 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div
+                  data-testid={`checkout-step-${s.key}`}
+                  style={{
+                    width: 44, height: 44, borderRadius: "50%",
+                    background: done ? "#22C55E" : active ? "#fff" : "rgba(255,255,255,0.3)",
+                    color: done ? "#fff" : active ? "#2563EB" : "rgba(255,255,255,0.6)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, fontWeight: 800,
+                    border: active ? "none" : done ? "none" : "1.5px solid rgba(255,255,255,0.4)",
+                    boxShadow: active ? "0 0 0 3px rgba(253, 230, 138, 0.55)" : "none",
+                    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                >
+                  {done ? <Check style={{ width: 18, height: 18 }} /> : idx + 1}
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: active ? 700 : 500,
+                  color: active ? "#fff" : done ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.55)",
+                  marginTop: 4, whiteSpace: "nowrap",
+                }}>
+                  {s.label}
+                </span>
               </div>
-              <span style={{
-                fontSize: 10, fontWeight: active ? 700 : 500,
-                color: active ? "#fff" : done ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.55)",
-                marginTop: 4, whiteSpace: "nowrap",
-              }}>
-                {s.label}
-              </span>
+              {idx < STEP_LABELS.length - 1 && (
+                <div style={{
+                  flex: 1, height: 2, margin: "0 8px",
+                  background: done ? "#22C55E" : "rgba(255,255,255,0.25)",
+                  borderRadius: 2, marginBottom: 16, transition: "background 0.3s",
+                }} />
+              )}
             </div>
-            {idx < STEP_LABELS.length - 1 && (
-              <div style={{
-                flex: 1, height: 2, margin: "0 8px",
-                background: done ? "#22C55E" : "rgba(255,255,255,0.25)",
-                borderRadius: 2, marginBottom: 16, transition: "background 0.3s",
-              }} />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -193,7 +209,7 @@ function InputField({
         placeholder={placeholder}
         disabled={disabled}
         style={{
-          width: "100%", padding: "12px 14px",
+          width: "100%", padding: "12px 14px", minHeight: 44,
           border: `1.5px solid ${error ? "#EF4444" : "#E5E7EB"}`,
           borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box",
           color: "#1F2937", background: disabled ? "#F9FAFB" : "#fff",
@@ -248,11 +264,30 @@ export default function IngressosCheckoutPage() {
   const dadosValues = dadosForm.watch()
 
   const total = getCartTotal(cart)
+  const {
+    holdId,
+    sessionId,
+    minutes: holdMinutes,
+    seconds: holdSeconds,
+    isExpired: holdExpired,
+    error: holdError,
+    isAcquiring: holdAcquiring,
+    acquire: reacquireHold,
+  } = useTicketHold(cart)
 
   useEffect(() => {
     if (cart.length === 0) navigate("/ingressos")
-    trackEvent("checkout_view", { step: "email" })
-  }, [])
+  }, [cart.length, navigate])
+
+  useEffect(() => {
+    if (step === "pagamento") {
+      trackEvent("pix_checkout_view", { paymentMethod, hasPayment: Boolean(paymentData) })
+    } else {
+      trackEvent("checkout_view", { step })
+    }
+    // paymentData intencional fora das deps — evita re-track a cada QR
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, paymentMethod])
 
   useEffect(() => {
     if (step !== "pagamento" || paymentMethod !== "pix" || !paymentData) return
@@ -279,8 +314,9 @@ export default function IngressosCheckoutPage() {
     }
   },
  })
+ const pixIdempotencyKeyRef = useRef<string | null>(null)
  const createPaymentMutation = useMutation({
-  mutationFn: async () => {
+  mutationFn: async (opts?: { holdId?: string | null }) => {
     const dados = dadosForm.getValues()
     const payload = {
       items: cart.map((c) => ({
@@ -293,8 +329,19 @@ export default function IngressosCheckoutPage() {
         cpf: dados.cpf.replace(/\D/g, ""),
         phone: dados.phone.replace(/\D/g, ""),
       },
+      holdId: opts?.holdId ?? holdId ?? undefined,
+      sessionId,
     }
-    const res = await apiRequest("POST", "/api/payments/tickets/create", payload)
+    // Fase 10: mesma chave em retries da mesma tentativa de Pix
+    if (!pixIdempotencyKeyRef.current) {
+      pixIdempotencyKeyRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `tkt-${sessionId}-${Date.now()}`
+    }
+    const res = await apiRequest("POST", "/api/payments/tickets/create", payload, {
+      headers: { "Idempotency-Key": pixIdempotencyKeyRef.current },
+    })
     return res.json() as Promise<PaymentData>
   },
   onSuccess: (data) => {
@@ -351,6 +398,12 @@ export default function IngressosCheckoutPage() {
     clearCheckoutPrefill()
     const tok = paymentData?.voucherToken ? `?token=${encodeURIComponent(paymentData.voucherToken)}` : ""
     navigate(`/pedido/${paymentData?.transactionId}${tok}`)
+    return
+  }
+  if (statusData.status === "EXPIRED") {
+    trackEvent("pix_payment_expired", { transactionId: paymentData?.transactionId })
+  } else if (statusData.status === "FAILED") {
+    trackEvent("pix_payment_failed", { transactionId: paymentData?.transactionId })
   }
 }, [statusData, paymentData, navigate])
 
@@ -384,9 +437,15 @@ export default function IngressosCheckoutPage() {
     setStep("pagamento")
   }
 
-  function handleConfirmPayment() {
+  async function handleConfirmPayment() {
+    let activeHoldId = holdId
+    if (holdExpired || holdError || !activeHoldId) {
+      const renewed = await reacquireHold()
+      if (!renewed) return
+      activeHoldId = renewed.holdId
+    }
     if (paymentMethod === "pix") {
-      createPaymentMutation.mutate()
+      createPaymentMutation.mutate({ holdId: activeHoldId })
     } else if (paymentMethod === "cartao") {
       trackEvent("checkout_card_simulated")
       setCardConfirmed(true)
@@ -451,14 +510,37 @@ export default function IngressosCheckoutPage() {
   )
 }
 
+  const holdBannerProps = {
+    minutes: holdMinutes,
+    seconds: holdSeconds,
+    isExpired: holdExpired,
+    isAcquiring: holdAcquiring,
+    error: holdError,
+    onRetry: () => { void reacquireHold() },
+  }
+
   const sidebarProps = {
     cart,
     total,
     selectedDate,
+    muteCheckoutCta: step === "pagamento" && !paymentData,
+    holdSlot: !paymentData ? (
+      <div>
+        <HoldTimerBanner {...holdBannerProps} variant="compact" />
+        <div style={{ marginBottom: 12 }} data-testid="sidebar-goal-wrap">
+          <GoalProgressBar
+            stage={stageFromCheckoutStep(step)}
+            tone="onLight"
+            compact
+            testId="sidebar-goal-progress"
+          />
+        </div>
+      </div>
+    ) : undefined,
     onCheckout: () => {
       if (step === "email") emailForm.handleSubmit(handleNextEmail)()
       else if (step === "dados") dadosForm.handleSubmit(handleNextDados)()
-      else if (step === "pagamento" && !paymentData && !cardConfirmed) handleConfirmPayment()
+      else if (step === "pagamento" && !paymentData && !cardConfirmed) void handleConfirmPayment()
     },
   }
 
@@ -522,6 +604,16 @@ export default function IngressosCheckoutPage() {
         <div style={{ flex: 1, minWidth: 0, padding: isDesktop ? "24px 0 24px 24px" : "0" }}>
           <div style={{ padding: isDesktop ? 0 : 16, maxWidth: 560 }}>
 
+            {/* Fase 6: no mobile o hold fica sticky no topo do formulário; no desktop vai na sidebar */}
+            {!paymentData && !isDesktop && (
+              <div
+                style={{ position: "sticky", top: 0, zIndex: 40, paddingTop: 4, background: "#F8FAFC" }}
+                data-testid="hold-sticky-mobile"
+              >
+                <HoldTimerBanner {...holdBannerProps} variant="full" />
+              </div>
+            )}
+
             {step === "email" && (
               <form
                 onSubmit={emailForm.handleSubmit(handleNextEmail)}
@@ -552,7 +644,7 @@ export default function IngressosCheckoutPage() {
                   type="button"
                   data-testid="button-continue-google"
                   style={{
-                    width: "100%", padding: "13px 0", border: "1.5px solid #E5E7EB",
+                    width: "100%", padding: "13px 0", minHeight: 44, border: "1.5px solid #E5E7EB",
                     borderRadius: 12, background: "#fff", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                     fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 12,
@@ -577,7 +669,7 @@ export default function IngressosCheckoutPage() {
                   type="button"
                   data-testid="button-continue-apple"
                   style={{
-                    width: "100%", padding: "13px 0", border: "none",
+                    width: "100%", padding: "13px 0", minHeight: 44, border: "none",
                     borderRadius: 12, background: "#000", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                     fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 20,
@@ -610,7 +702,7 @@ export default function IngressosCheckoutPage() {
                     {...emailForm.register("email")}
                     placeholder="seu@email.com.br"
                     style={{
-                      width: "100%", padding: "12px 14px",
+                      width: "100%", padding: "12px 14px", minHeight: 44,
                       border: `1.5px solid ${emailForm.formState.errors.email ? "#EF4444" : "#E5E7EB"}`,
                       borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box",
                       color: "#1F2937",
@@ -627,7 +719,7 @@ export default function IngressosCheckoutPage() {
                   type="submit"
                   data-testid="button-next-email"
                   style={{
-                    width: "100%", padding: "14px 0", border: "none", borderRadius: 12,
+                    width: "100%", padding: "14px 0", minHeight: 48, border: "none", borderRadius: 12,
                     background: "linear-gradient(135deg, #0891B2, #2563EB)",
                     color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -879,7 +971,7 @@ export default function IngressosCheckoutPage() {
                       onChange={(e) => dadosForm.setValue("cupom", e.target.value.toUpperCase())}
                       placeholder="Ex: RSV10"
                       style={{
-                        flex: 1, padding: "12px 14px",
+                        flex: 1, padding: "12px 14px", minHeight: 44,
                         border: "1.5px solid #E5E7EB",
                         borderRadius: 10, fontSize: 14, outline: "none", color: "#1F2937",
                         fontFamily: "monospace", letterSpacing: 1,
@@ -889,7 +981,7 @@ export default function IngressosCheckoutPage() {
                       type="button"
                       data-testid="button-apply-cupom"
                       style={{
-                        padding: "12px 16px", border: "none", borderRadius: 10,
+                        padding: "12px 16px", minHeight: 44, border: "none", borderRadius: 10,
                         background: "#F3F4F6", color: "#374151",
                         fontWeight: 700, fontSize: 13, cursor: "pointer",
                       }}
@@ -904,7 +996,7 @@ export default function IngressosCheckoutPage() {
                   type="submit"
                   data-testid="button-next-dados"
                   style={{
-                    width: "100%", padding: "14px 0", border: "none", borderRadius: 12,
+                    width: "100%", padding: "14px 0", minHeight: 48, border: "none", borderRadius: 12,
                     background: "linear-gradient(135deg, #0891B2, #2563EB)",
                     color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -923,100 +1015,179 @@ export default function IngressosCheckoutPage() {
                     background: "#fff", borderRadius: 16, padding: 24,
                     boxShadow: "0 2px 12px rgba(0,0,0,0.06)", marginBottom: 16,
                   }}>
-                    <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 18px", color: "#1F2937" }}>
-                      Escolha a forma de pagamento
-                    </h3>
+                    {/* Squint Test / Von Restorff: Pix como único CTA protagonista */}
+                    <div
+                      data-testid="payment-pix-hero"
+                      style={{
+                        border: "2px solid #22C55E",
+                        borderRadius: 14,
+                        padding: "14px 16px",
+                        marginBottom: 16,
+                        background: "linear-gradient(135deg, #F0FDF4, #ECFDF5)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                        background: "linear-gradient(135deg, #22C55E, #16A34A)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <svg width="24" height="24" viewBox="0 0 512 512" fill="white" aria-hidden>
+                          <path d="M242.4 292.5C247.8 287.1 255.1 284.1 262.7 284.1C270.2 284.1 277.5 287.1 282.9 292.5L376.1 385.7C387.3 396.9 405.4 396.9 416.7 385.7L492.3 310.1C514.8 287.6 514.8 251.2 492.3 228.7L416.7 153.2C405.4 142 387.3 142 376.1 153.2L283.4 245.8C278 251.2 270.8 254.2 263.2 254.2C255.6 254.2 248.5 251.2 243.1 245.8L150.3 153C139.1 141.8 120.1 141.8 109.8 153L34.19 228.6C11.69 251.1 11.69 287.5 34.19 310L109.8 385.6C120.1 396.8 138.1 396.8 150.3 385.6L242.4 292.5z"/>
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: "#14532D" }}>Pagar com Pix</span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 999,
+                            background: "#22C55E", color: "#fff",
+                          }}>
+                            Recomendado
+                          </span>
+                        </div>
+                        <p style={{ margin: "2px 0 0", fontSize: 12, color: "#166534" }}>
+                          Aprovação imediata · sem cartão · 100% seguro
+                        </p>
+                      </div>
+                    </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-                      {([
-                        {
-                          key: "pix" as PaymentMethod,
-                          label: "PIX",
-                          sublabel: "Pagamento instantâneo — aprovação imediata",
-                          badge: "Recomendado",
-                          badgeColor: "#22C55E",
-                          icon: (
-                            <div style={{
-                              width: 40, height: 40, borderRadius: 10,
-                              background: "linear-gradient(135deg, #22C55E, #16A34A)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <svg width="24" height="24" viewBox="0 0 512 512" fill="white">
-                                <path d="M242.4 292.5C247.8 287.1 255.1 284.1 262.7 284.1C270.2 284.1 277.5 287.1 282.9 292.5L376.1 385.7C387.3 396.9 405.4 396.9 416.7 385.7L492.3 310.1C514.8 287.6 514.8 251.2 492.3 228.7L416.7 153.2C405.4 142 387.3 142 376.1 153.2L283.4 245.8C278 251.2 270.8 254.2 263.2 254.2C255.6 254.2 248.5 251.2 243.1 245.8L150.3 153C139.1 141.8 120.1 141.8 109.8 153L34.19 228.6C11.69 251.1 11.69 287.5 34.19 310L109.8 385.6C120.1 396.8 138.1 396.8 150.3 385.6L242.4 292.5zM262.7 226.2C255.1 226.2 247.8 223.2 242.4 217.8L149.7 125.1C138.4 113.9 120.3 113.9 109.1 125.1L33.47 200.7C10.97 223.2 10.97 259.6 33.47 282.1L109.1 357.7C120.3 368.9 138.4 368.9 149.7 357.7L242.8 264.7C248.2 259.3 255.4 256.3 263 256.3C270.5 256.3 277.8 259.3 283.2 264.7L375.9 357.4C387.2 368.6 405.2 368.6 416.5 357.4L492.1 281.8C514.6 259.3 514.6 222.9 492.1 200.4L416.5 124.8C405.2 113.6 387.2 113.6 375.9 124.8L283.5 217.5C278.1 222.9 270.9 226.2 262.7 226.2z"/>
-                              </svg>
-                            </div>
-                          ),
-                        },
-                        {
-                          key: "cartao" as PaymentMethod,
-                          label: "Cartão de Crédito",
-                          sublabel: "Visa, Mastercard, Elo, Amex",
-                          badge: null,
-                          icon: (
-                            <div style={{
-                              width: 40, height: 40, borderRadius: 10,
-                              background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <CreditCard style={{ width: 22, height: 22, color: "#fff" }} />
-                            </div>
-                          ),
-                        },
-                        {
-                          key: "apple-pay" as PaymentMethod,
-                          label: "Apple Pay",
-                          sublabel: isApplePay ? "Disponível neste dispositivo" : "Disponível somente em Safari/iOS/macOS",
-                          badge: null,
-                          icon: (
-                            <div style={{
-                              width: 40, height: 40, borderRadius: 10,
-                              background: "#000",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <Smartphone style={{ width: 22, height: 22, color: "#fff" }} />
-                            </div>
-                          ),
-                        },
-                      ]).map(({ key, label, sublabel, badge, badgeColor, icon }) => (
+                    <CheckoutSummaryCard
+                      items={cart}
+                      totalAmount={total}
+                      originalTotal={total}
+                      totalSavings={0}
+                      isCombo={false}
+                      cupom={dadosValues.cupom || undefined}
+                    />
+
+                    {paymentMethod === "pix" && (
+                      <p
+                        data-testid="zeigarnik-payment-nudge"
+                        style={{
+                          margin: "14px 0 0",
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          background: "linear-gradient(135deg, #FFFBEB, #FEF3C7)",
+                          border: "1px solid #FDE68A",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#92400E",
+                          textAlign: "center",
+                        }}
+                      >
+                        Quase lá — complete o Pix para não perder a reserva
+                      </p>
+                    )}
+
+                    {paymentMethod === "pix" && (
+                      <button
+                        data-testid="button-confirm-payment"
+                        onClick={() => { void handleConfirmPayment() }}
+                        disabled={createPaymentMutation.isPending || holdAcquiring}
+                        style={{
+                          width: "100%", padding: "18px 0", border: "none", borderRadius: 14,
+                          marginTop: 10, marginBottom: 8,
+                          background: (createPaymentMutation.isPending || holdAcquiring)
+                            ? "#9CA3AF"
+                            : holdExpired || holdError
+                              ? "linear-gradient(135deg, #F97316, #EA580C)"
+                              : "linear-gradient(135deg, #22C55E, #16A34A)",
+                          color: "#fff", fontSize: 17, fontWeight: 800,
+                          cursor: (createPaymentMutation.isPending || holdAcquiring) ? "not-allowed" : "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          boxShadow: "0 8px 24px rgba(34,197,94,0.35)",
+                          minHeight: 56,
+                          transition: "transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
+                        }}
+                      >
+                        {createPaymentMutation.isPending
+                          ? <><Loader2 style={{ width: 20, height: 20, animation: "spin 1s linear infinite" }} /> Processando...</>
+                          : holdExpired || holdError
+                            ? <><Clock style={{ width: 20, height: 20 }} /> Renovar reserva e pagar</>
+                            : <><ShoppingCart style={{ width: 20, height: 20 }} /> Gerar QR Code Pix</>}
+                      </button>
+                    )}
+
+                    <p style={{ margin: "0 0 16px", fontSize: 11, color: "#9CA3AF", textAlign: "center" }}>
+                      <Lock style={{ width: 11, height: 11, display: "inline", marginRight: 4, verticalAlign: "middle" }} />
+                      Pagamento 100% seguro • Dados criptografados
+                    </p>
+
+                    {/* Hick: alternativas fora do caminho crítico */}
+                    <details
+                      data-testid="payment-other-methods"
+                      style={{
+                        borderTop: "1px solid #F3F4F6",
+                        paddingTop: 12,
+                        marginBottom: paymentMethod !== "pix" ? 16 : 0,
+                      }}
+                      open={paymentMethod !== "pix"}
+                      onToggle={(e) => {
+                        if (!(e.target as HTMLDetailsElement).open && paymentMethod !== "pix") {
+                          setPaymentMethod("pix")
+                        }
+                      }}
+                    >
+                      <summary
+                        style={{
+                          cursor: "pointer",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#6B7280",
+                          listStyle: "none",
+                          userSelect: "none",
+                        }}
+                      >
+                        Outras formas de pagamento
+                      </summary>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+                        {([
+                          {
+                            key: "cartao" as PaymentMethod,
+                            label: "Cartão de Crédito",
+                            sublabel: "Visa, Mastercard, Elo, Amex",
+                          },
+                          {
+                            key: "apple-pay" as PaymentMethod,
+                            label: "Apple Pay",
+                            sublabel: isApplePay ? "Disponível neste dispositivo" : "Somente Safari/iOS/macOS",
+                          },
+                        ]).map(({ key, label, sublabel }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            data-testid={`button-payment-${key}`}
+                            onClick={() => setPaymentMethod(key)}
+                            style={{
+                              width: "100%", border: `1.5px solid ${paymentMethod === key ? "#2563EB" : "#E5E7EB"}`,
+                              borderRadius: 10, padding: "12px 14px",
+                              minHeight: 44,
+                              background: paymentMethod === key ? "#EFF6FF" : "#FAFAFA",
+                              cursor: "pointer", textAlign: "left",
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>{label}</div>
+                            <div style={{ fontSize: 11, color: "#9CA3AF" }}>{sublabel}</div>
+                          </button>
+                        ))}
                         <button
-                          key={key}
-                          data-testid={`button-payment-${key}`}
-                          onClick={() => setPaymentMethod(key)}
+                          type="button"
+                          data-testid="button-payment-pix"
+                          onClick={() => setPaymentMethod("pix")}
                           style={{
-                            width: "100%", border: `2px solid ${paymentMethod === key ? "#2563EB" : "#E5E7EB"}`,
-                            borderRadius: 12, padding: "14px 16px",
-                            background: paymentMethod === key ? "#EFF6FF" : "#fff",
-                            cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
-                            textAlign: "left", transition: "all 0.15s",
+                            width: "100%", border: "1.5px solid #BBF7D0",
+                            borderRadius: 10, padding: "10px 14px",
+                            background: "#F0FDF4", cursor: "pointer", textAlign: "left",
+                            fontSize: 12, fontWeight: 700, color: "#15803D",
                           }}
                         >
-                          {icon}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontSize: 14, fontWeight: 700, color: "#1F2937" }}>{label}</span>
-                              {badge && (
-                                <span style={{
-                                  fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                                  background: badgeColor || "#22C55E", color: "#fff",
-                                }}>
-                                  {badge}
-                                </span>
-                              )}
-                            </div>
-                            <span style={{ fontSize: 12, color: "#6B7280" }}>{sublabel}</span>
-                          </div>
-                          <div style={{
-                            width: 20, height: 20, borderRadius: "50%",
-                            border: `2px solid ${paymentMethod === key ? "#2563EB" : "#D1D5DB"}`,
-                            background: paymentMethod === key ? "#2563EB" : "transparent",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0,
-                          }}>
-                            {paymentMethod === key && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
-                          </div>
+                          Voltar para Pix (recomendado)
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    </details>
 
                     {paymentMethod === "cartao" && (
                       <div style={{
@@ -1108,7 +1279,7 @@ export default function IngressosCheckoutPage() {
                     {createPaymentMutation.isError && (
                       <div style={{
                         background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10,
-                        padding: "10px 14px", marginBottom: 14,
+                        padding: "10px 14px", marginBottom: 14, marginTop: 12,
                         display: "flex", alignItems: "center", gap: 8,
                       }} data-testid="alert-payment-error">
                         <AlertCircle style={{ width: 16, height: 16, color: "#EF4444", flexShrink: 0 }} />
@@ -1118,42 +1289,23 @@ export default function IngressosCheckoutPage() {
                       </div>
                     )}
 
-                    <CheckoutSummaryCard
-                      items={cart}
-                      totalAmount={total}
-                      originalTotal={total}
-                      totalSavings={0}
-                      isCombo={false}
-                      cupom={dadosValues.cupom || undefined}
-                    />
-
-                    <button
-                      data-testid="button-confirm-payment"
-                      onClick={handleConfirmPayment}
-                      disabled={createPaymentMutation.isPending || (paymentMethod === "apple-pay" && !isApplePay)}
-                      style={{
-                        width: "100%", padding: "15px 0", border: "none", borderRadius: 12,
-                        background: (createPaymentMutation.isPending || (paymentMethod === "apple-pay" && !isApplePay))
-                          ? "#9CA3AF"
-                          : "linear-gradient(135deg, #22C55E, #16A34A)",
-                        color: "#fff", fontSize: 16, fontWeight: 800,
-                        cursor: (createPaymentMutation.isPending || (paymentMethod === "apple-pay" && !isApplePay)) ? "not-allowed" : "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                        boxShadow: "0 4px 14px rgba(34,197,94,0.3)",
-                      }}
-                    >
-                      {createPaymentMutation.isPending
-                        ? <><Loader2 style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }} /> Processando...</>
-                        : paymentMethod === "pix" ? <><ShoppingCart style={{ width: 18, height: 18 }} /> Gerar QR Code Pix</>
-                        : paymentMethod === "cartao" ? <><CreditCard style={{ width: 18, height: 18 }} /> Pagar com Cartão (simulado)</>
-                        : <><Smartphone style={{ width: 18, height: 18 }} /> Pagar com Apple Pay</>
-                      }
-                    </button>
-
-                    <p style={{ margin: "10px 0 0", fontSize: 11, color: "#9CA3AF", textAlign: "center" }}>
-                      <Lock style={{ width: 11, height: 11, display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-                      Pagamento 100% seguro • Dados criptografados
-                    </p>
+                    {paymentMethod === "cartao" && (
+                      <button
+                        data-testid="button-confirm-card"
+                        onClick={() => { void handleConfirmPayment() }}
+                        style={{
+                          width: "100%", padding: "14px 0", border: "none", borderRadius: 12,
+                          marginTop: 12,
+                          background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+                          color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          minHeight: 48,
+                        }}
+                      >
+                        <CreditCard style={{ width: 18, height: 18 }} />
+                        Pagar com Cartão (simulado)
+                      </button>
+                    )}
                   </div>
                 )}
 

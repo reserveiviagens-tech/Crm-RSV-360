@@ -1,6 +1,7 @@
 import { ShoppingCart, ArrowRight } from "lucide-react"
 import { type CartItem } from "@/lib/cart-store"
 import { trackEvent } from "@/lib/analytics"
+import { GoalProgressBar } from "@/components/checkout/GoalProgressBar"
 
 interface CartStickyBarProps {
   cart: CartItem[]
@@ -34,13 +35,23 @@ export function CartStickyBar({ cart, total, onCheckout }: CartStickyBarProps) {
         zIndex: 220,
         background: "linear-gradient(135deg, #0891B2, #2563EB)",
         boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
-        padding: "12px 16px",
+        padding: "10px 16px 12px",
         paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
       }}
     >
+      <div style={{ maxWidth: 960, width: "100%", margin: "0 auto 8px" }}>
+        <GoalProgressBar
+          stage="cart"
+          tone="onDark"
+          compact
+          testId="cart-goal-progress"
+        />
+      </div>
+
       <div
         style={{
-          maxWidth: 600,
+          maxWidth: 960,
+          width: "100%",
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
@@ -64,12 +75,25 @@ export function CartStickyBar({ cart, total, onCheckout }: CartStickyBarProps) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>
-            {itemsCount} {itemsCount === 1 ? "ingresso" : "ingressos"}
+            {itemsCount} {itemsCount === 1 ? "ingresso" : "ingressos"} · {formatPrice(total)}
           </div>
           <div
             style={{
               fontSize: 10,
-              color: "rgba(255,255,255,0.75)",
+              color: "rgba(255,255,255,0.8)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontWeight: 600,
+            }}
+            data-testid="cart-zeigarnik-copy"
+          >
+            Reserva incompleta — finalize agora
+          </div>
+          <div
+            style={{
+              fontSize: 10,
+              color: "rgba(255,255,255,0.65)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -79,36 +103,30 @@ export function CartStickyBar({ cart, total, onCheckout }: CartStickyBarProps) {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)" }}>Total</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>
-              {formatPrice(total)}
-            </div>
-          </div>
-
-          <button
-            data-testid="button-go-checkout"
-            onClick={handleCheckout}
-            style={{
-              background: "#fff",
-              color: "#0891B2",
-              border: "none",
-              borderRadius: 10,
-              padding: "10px 16px",
-              fontWeight: 800,
-              fontSize: 13,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Ir para pagamento
-            <ArrowRight style={{ width: 14, height: 14 }} />
-          </button>
-        </div>
+        <button
+          data-testid="button-go-checkout"
+          onClick={handleCheckout}
+          style={{
+            background: "#fff",
+            color: "#0891B2",
+            border: "none",
+            borderRadius: 12,
+            padding: "12px 16px",
+            fontWeight: 800,
+            fontSize: 13,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            whiteSpace: "nowrap",
+            minHeight: 48,
+            boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+            flexShrink: 0,
+          }}
+        >
+          Continuar
+          <ArrowRight style={{ width: 14, height: 14 }} />
+        </button>
       </div>
     </div>
   )

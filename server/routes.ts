@@ -21,6 +21,20 @@ import { emitEstadoGrupo, emitPixExpirado, emitVigilancia } from "./socket";
 import { createExcursionGroup, sendTextToGroup, sendPollToGroup, sendPaymentConfirmation, getWaasStatus, createInstance, getInstanceStatus, getQRCode, deleteInstance, fetchAllGroups, handleWebhookEvent } from "./services/whatsapp.service";
 import { createSplitPaymentPix, checkPaymentStatus } from "./services/payment.service";
 import { createTicketPix, checkTicketPaymentStatus, cancelTicketPix, demoAutoConfirmCallbacks, UnknownTicketError } from "./services/ticket-payment.service";
+import {
+  acquireHold,
+  attachHoldToTransaction,
+  consumeHoldByTransaction,
+  getAvailabilitySnapshot,
+  getHold,
+  refreshHold,
+  releaseHold,
+  releaseHoldByTransaction,
+  InsufficientInventoryError,
+  HoldNotFoundError,
+  HoldConflictError,
+  TICKET_HOLD_TTL_MS,
+} from "./services/ticket-hold.service";
 import { pauseAI, resumeAI, isAIPaused, getHandoffInfo, listPausedGroups } from "./services/humanHandoff.service";
 import {
   gerarManifestoANTT,
@@ -2171,12 +2185,37 @@ export async function registerRoutes(
   });
 
   // ─────────────────────────────────────────────
-  // NTX — Analytics pageview
+  // NTX — Analytics pageview + Fase 12 events batch
   // ─────────────────────────────────────────────
   app.post("/api/analytics/pageview", (req: Request, res: Response) => {
     const { slug, page } = req.body as { slug?: string; page?: string };
     console.log(`[Analytics] pageview: ${page ?? "?"} / ${slug ?? "?"} at ${new Date().toISOString()}`);
     return res.json({ ok: true });
+  });
+
+  app.post("/api/analytics/events", async (req: Request, res: Response) => {
+    const { ingestAnalyticsEvents } = await import("./services/analytics-events.service.js");
+    const body = req.body as { events?: unknown };
+    const events = Array.isArray(body.events) ? body.events : [];
+    if (events.length === 0) {
+      return res.status(400).json({ message: "events[] é obrigatório", code: "ANALYTICS_EMPTY" });
+    }
+    if (events.length > 50) {
+      return res.status(400).json({ message: "Máximo 50 eventos por lote", code: "ANALYTICS_BATCH_LIMIT" });
+    }
+    const result = ingestAnalyticsEvents(events as Parameters<typeof ingestAnalyticsEvents>[0]);
+    return res.status(202).json({ ok: true, ...result });
+  });
+
+  app.get("/api/analytics/recent", async (req: Request, res: Response) => {
+    const { listRecentAnalytics, analyticsStats } = await import(
+      "./services/analytics-events.service.js"
+    );
+    const limit = parseInt(String(req.query.limit ?? "50"), 10) || 50;
+    return res.json({
+      items: listRecentAnalytics(limit),
+      stats: analyticsStats(),
+    });
   });
 
   // ─────────────────────────────────────────────
@@ -2255,10 +2294,106 @@ export async function registerRoutes(
     voucherToken: string;
   }>();
 
+  // ── Fase 5: locks atômicos + hold timer de ingressos ──────────────────────
+  app.get("/api/tickets/availability", (req: Request, res: Response) => {
+    const idsParam = typeof req.query.ids === "string" ? req.query.ids : "";
+    const ids = idsParam
+      ? idsParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    return res.json({
+      ttlMs: TICKET_HOLD_TTL_MS,
+      tickets: getAvailabilitySnapshot(ids),
+    });
+  });
+
+  app.post("/api/tickets/holds", (req: Request, res: Response) => {
+    const { sessionId, items } = req.body as {
+      sessionId?: string;
+      items?: Array<{ ticketId?: string; quantity?: number }>;
+    };
+    if (!sessionId || typeof sessionId !== "string") {
+      return res.status(400).json({ message: "sessionId é obrigatório" });
+    }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "items é obrigatório" });
+    }
+    try {
+      const hold = acquireHold(
+        sessionId,
+        items.map((i) => ({
+          ticketId: String(i.ticketId ?? ""),
+          quantity: Number(i.quantity ?? 0),
+        })),
+      );
+      logger.info("[tickets/holds] Hold adquirido", {
+        holdId: hold.holdId,
+        sessionId: hold.sessionId,
+        expiresAt: hold.expiresAt,
+        items: hold.items.length,
+      });
+      return res.status(201).json(hold);
+    } catch (err) {
+      if (err instanceof InsufficientInventoryError) {
+        return res.status(409).json({
+          message: err.message,
+          ticketId: err.ticketId,
+          requested: err.requested,
+          available: err.available,
+          code: "INSUFFICIENT_INVENTORY",
+        });
+      }
+      if (err instanceof HoldConflictError) {
+        return res.status(400).json({ message: err.message, code: "HOLD_CONFLICT" });
+      }
+      logger.error("[tickets/holds] Erro ao adquirir hold", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return res.status(500).json({ message: "Erro ao reservar ingressos" });
+    }
+  });
+
+  app.get("/api/tickets/holds/:holdId", (req: Request, res: Response) => {
+    const hold = getHold(String(req.params.holdId));
+    if (!hold) return res.status(404).json({ message: "Hold não encontrado" });
+    return res.json(hold);
+  });
+
+  app.post("/api/tickets/holds/:holdId/refresh", (req: Request, res: Response) => {
+    try {
+      const hold = refreshHold(String(req.params.holdId));
+      return res.json(hold);
+    } catch (err) {
+      if (err instanceof HoldNotFoundError) {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err instanceof HoldConflictError) {
+        return res.status(409).json({ message: err.message, code: "HOLD_CONFLICT" });
+      }
+      return res.status(500).json({ message: "Erro ao renovar hold" });
+    }
+  });
+
+  app.delete("/api/tickets/holds/:holdId", (req: Request, res: Response) => {
+    try {
+      const hold = releaseHold(String(req.params.holdId));
+      return res.json(hold);
+    } catch (err) {
+      if (err instanceof HoldNotFoundError) {
+        return res.status(404).json({ message: err.message });
+      }
+      if (err instanceof HoldConflictError) {
+        return res.status(409).json({ message: err.message, code: "HOLD_CONFLICT" });
+      }
+      return res.status(500).json({ message: "Erro ao liberar hold" });
+    }
+  });
+
   app.post("/api/payments/tickets/create", async (req: Request, res: Response) => {
-    const { items, customer } = req.body as {
+    const { items, customer, holdId, sessionId } = req.body as {
       items?: Array<{ ticketId: string; quantity: number }>;
       customer?: { name: string; email: string; cpf: string; phone: string };
+      holdId?: string;
+      sessionId?: string;
     };
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Items é obrigatório" });
@@ -2272,9 +2407,103 @@ export async function registerRoutes(
     if (!customer?.name || !customer?.email) {
       return res.status(400).json({ message: "Dados do cliente são obrigatórios" });
     }
+
+    const {
+      normalizeIdempotencyKey,
+      fingerprintTicketCreatePayload,
+      lookupIdempotentPayment,
+      storeIdempotentPayment,
+    } = await import("./services/payment-idempotency.service.js");
+
+    const rawIdem =
+      req.headers["idempotency-key"] ?? req.headers["Idempotency-Key"];
+    const idemKey = normalizeIdempotencyKey(
+      Array.isArray(rawIdem) ? rawIdem[0] : rawIdem
+    );
+    if (rawIdem != null && rawIdem !== "" && !idemKey) {
+      return res.status(400).json({
+        message: "Idempotency-Key inválida (use 1–128 chars: A-Z a-z 0-9 . _ : -)",
+        code: "INVALID_IDEMPOTENCY_KEY",
+      });
+    }
+
+    const customerForFp = {
+      name: customer.name,
+      email: customer.email,
+      cpf: customer.cpf ?? "",
+      phone: customer.phone ?? "",
+    };
+    const fingerprint = fingerprintTicketCreatePayload({
+      items: items.map((i) => ({
+        ticketId: i.ticketId,
+        quantity: Math.floor(i.quantity),
+      })),
+      customer: customerForFp,
+    });
+
+    if (idemKey) {
+      const lookup = lookupIdempotentPayment(idemKey, fingerprint);
+      if (lookup.kind === "hit") {
+        logger.info("[tickets/create] Resposta idempotente reutilizada", {
+          idempotencyKey: idemKey,
+          transactionId: lookup.record.transactionId,
+        });
+        res.setHeader("Idempotent-Replay", "true");
+        return res.status(lookup.record.statusCode).json(lookup.record.body);
+      }
+      if (lookup.kind === "conflict") {
+        return res.status(409).json({
+          message: "Idempotency-Key já usada com payload diferente",
+          code: "IDEMPOTENCY_KEY_REUSE",
+        });
+      }
+    }
+
     try {
       const lineItems = items.map((i) => ({ ticketId: i.ticketId, quantity: Math.floor(i.quantity) }));
+
+      // Garante retenção atômica antes de criar o Pix
+      let activeHoldId = typeof holdId === "string" ? holdId : "";
+      if (activeHoldId) {
+        const existing = getHold(activeHoldId);
+        if (!existing || (existing.status !== "ACTIVE" && existing.status !== "ATTACHED")) {
+          return res.status(409).json({
+            message: "Sua reserva temporária expirou. Selecione os ingressos novamente.",
+            code: "HOLD_EXPIRED",
+          });
+        }
+      } else {
+        const sid = typeof sessionId === "string" && sessionId ? sessionId : randomUUID();
+        try {
+          const hold = acquireHold(sid, lineItems);
+          activeHoldId = hold.holdId;
+        } catch (holdErr) {
+          if (holdErr instanceof InsufficientInventoryError) {
+            return res.status(409).json({
+              message: holdErr.message,
+              ticketId: holdErr.ticketId,
+              available: holdErr.available,
+              code: "INSUFFICIENT_INVENTORY",
+            });
+          }
+          throw holdErr;
+        }
+      }
+
       const result = await createTicketPix(lineItems, customer);
+      try {
+        attachHoldToTransaction(activeHoldId, result.transactionId, result.expirationDate, lineItems);
+      } catch (attachErr) {
+        logger.error("[tickets/create] Falha ao vincular hold", {
+          holdId: activeHoldId,
+          error: attachErr instanceof Error ? attachErr.message : String(attachErr),
+        });
+        return res.status(409).json({
+          message: "Não foi possível confirmar a retenção dos ingressos. Tente novamente.",
+          code: "HOLD_ATTACH_FAILED",
+        });
+      }
+
       const voucherId = randomUUID();
       const voucherToken = signVoucherId(voucherId);
       ticketTransactions.set(result.transactionId, {
@@ -2289,14 +2518,19 @@ export async function registerRoutes(
         totalAmount: result.totalAmount,
         demo: result.demo,
         voucherId,
+        holdId: activeHoldId,
+        idempotencyKey: idemKey ?? undefined,
       });
       if (result.demo) {
         demoAutoConfirmCallbacks.set(result.transactionId, () => {
           const txn = ticketTransactions.get(result.transactionId);
-          if (txn && txn.status === "PENDING") txn.status = "APPROVED";
+          if (txn && txn.status === "PENDING") {
+            txn.status = "APPROVED";
+            consumeHoldByTransaction(result.transactionId);
+          }
         });
       }
-      return res.status(201).json({
+      const responseBody = {
         transactionId: result.transactionId,
         status: result.status,
         qrCodeBase64: result.qrCodeBase64,
@@ -2311,7 +2545,12 @@ export async function registerRoutes(
         demo: result.demo,
         voucherId,
         voucherToken,
-      });
+        holdId: activeHoldId,
+      };
+      if (idemKey) {
+        storeIdempotentPayment(idemKey, fingerprint, 201, responseBody, result.transactionId);
+      }
+      return res.status(201).json(responseBody);
     } catch (err) {
       if (err instanceof UnknownTicketError) {
         return res.status(422).json({ message: err.message });
@@ -2331,13 +2570,25 @@ export async function registerRoutes(
       if (txn.demo) {
         const expiredMs = new Date(txn.expirationDate).getTime();
         if (Date.now() > expiredMs) {
-          txn.status = "EXPIRED";
+          if (txn.status === "PENDING") {
+            txn.status = "EXPIRED";
+            releaseHoldByTransaction(id);
+          }
           return res.json({ status: "EXPIRED", paid: false });
         }
-        return res.json({ status: txn.status, paid: false });
+        if (txn.status === "APPROVED") {
+          consumeHoldByTransaction(id);
+        }
+        return res.json({ status: txn.status, paid: txn.status === "APPROVED" });
       }
       const { status, paid } = await checkTicketPaymentStatus(id);
+      const prev = txn.status;
       txn.status = status;
+      if (status === "APPROVED" && prev !== "APPROVED") {
+        consumeHoldByTransaction(id);
+      } else if ((status === "EXPIRED" || status === "CANCELLED" || status === "FAILED") && prev === "PENDING") {
+        releaseHoldByTransaction(id);
+      }
       return res.json({ status, paid });
     } catch (err) {
       logger.error("[tickets/status] Erro ao consultar status", { orderId: id, error: err instanceof Error ? err.message : String(err) });
@@ -2349,7 +2600,65 @@ export async function registerRoutes(
     const id = String(req.params.id);
     const txn = ticketTransactions.get(id);
     if (!txn) return res.status(404).json({ message: "Transação não encontrada" });
-    return res.json(txn);
+    const { slimPaymentDetails } = await import("./services/bff/order-bff.service.js");
+    // Fase 11: QR omitido por padrão (payload pesado); ?includeQr=1 restaura
+    const includeQr =
+      req.query.includeQr === "1" ||
+      req.query.includeQr === "true";
+    return res.json(slimPaymentDetails(txn, { includeQr }));
+  });
+
+  /** Fase 11 — BFF: pedido + status + Pix num único payload otimizado */
+  app.get("/api/bff/orders/:id", async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    const txn = ticketTransactions.get(id);
+    if (!txn) return res.status(404).json({ message: "Pedido não encontrado" });
+
+    const {
+      buildOrderBffFull,
+      buildOrderBffLite,
+    } = await import("./services/bff/order-bff.service.js");
+
+    const view = String(req.query.view ?? "full").toLowerCase() === "lite" ? "lite" : "full";
+
+    // Atualiza status via provider quando não-demo (mesmo fluxo do /status)
+    try {
+      if (!txn.demo) {
+        const { status, paid } = await checkTicketPaymentStatus(id);
+        const prev = txn.status;
+        txn.status = status;
+        if (status === "APPROVED" && prev !== "APPROVED") {
+          consumeHoldByTransaction(id);
+        } else if (
+          (status === "EXPIRED" || status === "CANCELLED" || status === "FAILED") &&
+          prev === "PENDING"
+        ) {
+          releaseHoldByTransaction(id);
+        }
+        void paid;
+      } else {
+        const expiredMs = new Date(txn.expirationDate).getTime();
+        if (Date.now() > expiredMs && txn.status === "PENDING") {
+          txn.status = "EXPIRED";
+          releaseHoldByTransaction(id);
+        }
+      }
+    } catch (err) {
+      logger.error("[bff/orders] Falha ao sincronizar status", {
+        orderId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (view === "lite") {
+      res.setHeader("Cache-Control", "private, max-age=5");
+      return res.json(buildOrderBffLite(txn));
+    }
+
+    const includeQr =
+      req.query.includeQr !== "0" && req.query.includeQr !== "false";
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.json(buildOrderBffFull(txn, { includeQr }));
   });
 
   app.post("/api/payments/tickets/:id/cancel", async (req: Request, res: Response) => {
@@ -2361,7 +2670,10 @@ export async function registerRoutes(
     }
     try {
       const { cancelled } = await cancelTicketPix(id);
-      if (cancelled) txn.status = "CANCELLED";
+      if (cancelled) {
+        txn.status = "CANCELLED";
+        releaseHoldByTransaction(id);
+      }
       return res.json({ cancelled, status: txn.status });
     } catch (err) {
       logger.error("[tickets/cancel] Erro ao cancelar cobrança", { orderId: id, error: err instanceof Error ? err.message : String(err) });
@@ -2376,6 +2688,7 @@ export async function registerRoutes(
     if (!txn.demo) return res.status(400).json({ message: "Apenas para modo demo" });
     if (txn.status !== "PENDING") return res.status(400).json({ message: "Transação não está pendente" });
     txn.status = "APPROVED";
+    consumeHoldByTransaction(id);
     const cb = demoAutoConfirmCallbacks.get(id);
     if (cb) { cb(); demoAutoConfirmCallbacks.delete(id); }
 
@@ -2408,10 +2721,29 @@ export async function registerRoutes(
     if (process.env.WEBHOOK_SECRET && apiKey !== process.env.WEBHOOK_SECRET) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const { transactionId, status } = req.body as { transactionId?: string; status?: string };
+    const { transactionId, status, eventId } = req.body as {
+      transactionId?: string
+      status?: string
+      eventId?: string
+    };
     if (!transactionId || !status) {
       return res.status(400).json({ message: "transactionId e status são obrigatórios" });
     }
+
+    const { buildWebhookEventKey, claimWebhookEvent } = await import(
+      "./services/webhook-idempotency.service.js"
+    );
+    const eventKey = buildWebhookEventKey({ eventId, transactionId, status });
+    const claim = claimWebhookEvent(eventKey);
+    if (!claim.isNew) {
+      logger.info("[webhooks/tickets] Evento duplicado ignorado", {
+        eventKey,
+        transactionId,
+        status,
+      });
+      return res.status(200).json({ received: true, duplicate: true, eventKey });
+    }
+
     const txn = ticketTransactions.get(transactionId);
     if (txn) {
       const map: Record<string, "PENDING" | "APPROVED" | "EXPIRED" | "FAILED" | "CANCELLED"> = {
@@ -2420,6 +2752,15 @@ export async function registerRoutes(
       };
       const prevStatus = txn.status;
       txn.status = map[status.toLowerCase()] ?? txn.status;
+
+      if (prevStatus !== "APPROVED" && txn.status === "APPROVED") {
+        consumeHoldByTransaction(transactionId);
+      } else if (
+        prevStatus === "PENDING" &&
+        (txn.status === "EXPIRED" || txn.status === "FAILED" || txn.status === "CANCELLED")
+      ) {
+        releaseHoldByTransaction(transactionId);
+      }
 
       if (prevStatus !== "APPROVED" && txn.status === "APPROVED") {
         import("./services/post-payment-orchestrator.service.js").then(({ runPostPaymentOrchestration }) => {
@@ -2444,7 +2785,7 @@ export async function registerRoutes(
         }).catch(() => {});
       }
     }
-    return res.status(200).json({ received: true });
+    return res.status(200).json({ received: true, duplicate: false, eventKey });
   });
 
   // ─── ORDERS / VOUCHER ──────────────────────────────────────────────────────

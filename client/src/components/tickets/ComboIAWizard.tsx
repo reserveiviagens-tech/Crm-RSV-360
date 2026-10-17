@@ -5,6 +5,7 @@ import { Sparkles, X } from "lucide-react"
 import { SuggestionCard } from "./SuggestionCard"
 import { ComboIAEmptyState } from "./ComboIAEmptyState"
 import { useComboRecommendations } from "@/hooks/useComboRecommendations"
+import { trackEvent } from "@/lib/analytics"
 import type { CartItem } from "@shared/schema"
 import type { ComboCartItem, RecommendationSuggestion } from "@/services/recommendationApi"
 
@@ -34,13 +35,23 @@ export function ComboIAWizard({ open, onDismiss, cartItems, onAddSuggestion }: C
     enabled: open && cartItems.length > 0,
   })
 
+  const handleDismiss = (reason: "skip" | "close" | "backdrop") => {
+    trackEvent("ai_combo_dismiss", { reason, suggestions: suggestions.length })
+    onDismiss()
+  }
+
   const handleAdd = (suggestion: RecommendationSuggestion) => {
+    trackEvent("ai_combo_accept", {
+      suggestionId: suggestion.id,
+      comboPrice: suggestion.comboPrice,
+      savings: suggestion.savings,
+    })
     onAddSuggestion(suggestion)
     onDismiss()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onDismiss()}>
+    <Dialog open={open} onOpenChange={(v) => !v && handleDismiss("backdrop")}>
       <DialogContent
         className="max-w-md w-full p-0 overflow-hidden rounded-2xl border-0 shadow-xl"
         data-testid="combo-ia-wizard"
@@ -57,7 +68,7 @@ export function ComboIAWizard({ open, onDismiss, cartItems, onAddSuggestion }: C
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/20 h-8 w-8"
-              onClick={onDismiss}
+              onClick={() => handleDismiss("close")}
               data-testid="combo-ia-skip-btn"
             >
               <X className="w-4 h-4" />
@@ -120,7 +131,7 @@ export function ComboIAWizard({ open, onDismiss, cartItems, onAddSuggestion }: C
           <Button
             variant="ghost"
             className="w-full text-sm text-gray-500 hover:text-gray-700"
-            onClick={onDismiss}
+            onClick={() => handleDismiss("skip")}
             data-testid="combo-ia-pular-btn"
           >
             Pular e continuar com meu carrinho

@@ -124,6 +124,7 @@ export function HotelCategoryNav({ categories, activeFilter, onSelect }: HotelCa
           flex-shrink: 0;
           position: relative;
           min-width: 68px;
+          min-height: 44px;
           transition: opacity 0.15s;
         }
         .rsv-hotel-cat-btn:active { opacity: 0.75; }

@@ -963,45 +963,33 @@ Seção "Conformidade": Config. Sistema (novo) + Configurações Conta (existent
 ## Regra específica da página /ingressos
 
 ### Princípio
-Ao trabalhar na rota `/ingressos`, preservar integralmente o layout visual existente. Evoluir por extensão funcional, nunca por redesign desnecessário.
+A página `/ingressos` deve evoluir sob o Master Plan PHASE_1–3 especificado em `rsv-ui-onboarding.mdc`. É permitida a reorganização do DOM, CompactContextBar, posicionamento do Combo IA e grades V13, desde que sejam mantidos intactos os contratos de query params, o carrinho de compras (`useTicketsCart`), as rotas de Pix sem split e a proibição de misturar lógica de excursões/ônibus. Arquivos do fluxo: `ingressos.tsx`, checkout, sucesso, `cart-store`, `ticket-payment.service`.
 
-### Manter obrigatoriamente
-- hero com gradiente azul
-- identidade RSV360 / Reservei Viagens
-- abas superiores (Todos, Dia Inteiro, Meio Dia, Mais Popular, Maior Desconto)
-- barra de prova social
-- bloco "COMBO IA — SUGESTÃO INTELIGENTE"
-- grid atual de cards
-- badges de desconto
-- badges de match
-- hierarquia atual de preços
-- CTA visual dos cards
-- bloco inferior de recomendação cruzada (CrossSellSection)
+### Manter obrigatoriamente (contratos / identidade)
+- identidade RSV360 / Reservei Viagens (azul profundo / royal)
+- bloco "COMBO IA — SUGESTÃO INTELIGENTE" (posição conforme PHASE_2: após o 1º parque)
+- badges de desconto e match
+- hierarquia de preços e CTA dos cards
+- bloco de recomendação cruzada (CrossSellSection)
+- prova social (pode ser reposicionada, não removida)
 
-### Permissões de evolução
+### Permissões de evolução (Master Plan PHASE_1–3)
 É permitido:
-- adicionar estado selecionado no card (borda + stepper)
-- adicionar stepper de quantidade (substitui botão sem mudar altura do card)
-- adicionar carrinho sticky/bottom bar
-- adicionar integração com checkout Pix (/ingressos/checkout)
-- adicionar estados de loading, empty e error
-- adicionar analytics (trackEvent)
-- adicionar data-testid
-- adicionar explicabilidade do combo IA
-- melhorar recomendação cruzada sem mudar layout
+- CompactContextBar + calendário em popover (`CalendarioIngressos`)
+- reordenar DOM above-the-fold (acordeões por parque, Combo IA, sidebar 340px)
+- grid V13 `auto-fit minmax(260px, 1fr)` e progressive disclosure de meia-entrada
+- fallback `onError` em imagens de cards
+- stepper, CartStickyBar, checkout Pix, loading/empty/error, analytics, data-testid
 
 ### Proibições
 Nunca:
-- transformar a página em landing page genérica
-- trocar o grid por lista
+- transformar a página em landing page genérica desconectada da marca
 - remover combo IA
 - remover social proof
-- trocar o visual principal de cards
 - misturar lógica de excursão nesta página
 - inserir elementos de ônibus, embarque, poltrona ou organizador
-- refatorar cores base sem necessidade
-- remover badges de desconto/match
 - substituir a arquitetura do front fora do padrão Vite + wouter + TanStack Query v5
+- Pix de ingresso com split
 
 ### Escopo correto da página /ingressos
 A rota `/ingressos` trata apenas de:

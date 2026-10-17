@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { MapPin, Calendar, ShoppingCart, ArrowRight, ChevronUp, ChevronDown, ChevronDown as ChevronBounce, Trash2 } from "lucide-react"
 import { type CartItem } from "@/lib/cart-store"
 
@@ -9,6 +9,10 @@ interface IngressosSidebarProps {
   onCheckout: () => void
   onRemove?: (ticketId: string) => void
   onNavigate?: (enterpriseId: string, city: string) => void
+  /** Fase 6: urgência do hold no topo do resumo (sidebar) */
+  holdSlot?: ReactNode
+  /** Quando true, CTA da sidebar fica secundário (Squint — CTA Pix no formulário) */
+  muteCheckoutCta?: boolean
 }
 
 function formatPrice(price: number) {
@@ -147,7 +151,7 @@ function SidebarTeasers({ onNavigate }: { onNavigate?: (enterpriseId: string, ci
   )
 }
 
-function SidebarContent({ cart, total, selectedDate, onCheckout, onRemove }: IngressosSidebarProps) {
+function SidebarContent({ cart, total, selectedDate, onCheckout, onRemove, holdSlot, muteCheckoutCta }: IngressosSidebarProps) {
   const itemsCount = cart.reduce((sum, it) => sum + it.quantity, 0)
 
   return (
@@ -172,6 +176,8 @@ function SidebarContent({ cart, total, selectedDate, onCheckout, onRemove }: Ing
       </div>
 
       <div style={{ padding: "14px 16px" }}>
+        {holdSlot}
+
         <div style={{
           display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10,
           padding: "10px 12px", background: "#F0FDF4", borderRadius: 10, border: "1px solid #DCFCE7",
@@ -248,19 +254,21 @@ function SidebarContent({ cart, total, selectedDate, onCheckout, onRemove }: Ing
                   </span>
                   {onRemove && (
                     <button
+                      type="button"
+                      className="rsv-stepper-btn"
                       data-testid={`button-remove-item-${item.ticketId}`}
                       onClick={() => onRemove(item.ticketId)}
                       title="Remover do carrinho"
+                      aria-label="Remover do carrinho"
                       style={{
-                        width: 26, height: 26, border: "none", borderRadius: 7,
+                        borderRadius: 10,
                         background: "#FEE2E2", color: "#EF4444",
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, transition: "background 0.15s",
+                        transition: "background 0.15s",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = "#FECACA")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "#FEE2E2")}
                     >
-                      <Trash2 style={{ width: 12, height: 12 }} />
+                      <Trash2 style={{ width: 16, height: 16 }} />
                     </button>
                   )}
                 </div>
@@ -277,27 +285,38 @@ function SidebarContent({ cart, total, selectedDate, onCheckout, onRemove }: Ing
               </span>
             </div>
 
-            <button
-              data-testid="sidebar-checkout-btn"
-              onClick={onCheckout}
-              style={{
-                width: "100%", padding: "13px 0", border: "none", borderRadius: 12,
-                background: "linear-gradient(135deg, #22C55E, #16A34A)",
-                color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                boxShadow: "0 4px 14px rgba(34,197,94,0.35)",
-                transition: "opacity 0.15s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.92")}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-            >
-              Ir para pagamento
-              <ArrowRight style={{ width: 16, height: 16 }} />
-            </button>
-
-            <p style={{ margin: "8px 0 0", fontSize: 10, color: "#9CA3AF", textAlign: "center" }}>
-              Pagamento 100% seguro • Pix instantâneo
-            </p>
+            {!muteCheckoutCta ? (
+              <>
+                <button
+                  data-testid="sidebar-checkout-btn"
+                  onClick={onCheckout}
+                  style={{
+                    width: "100%", padding: "13px 0", border: "none", borderRadius: 12,
+                    background: "linear-gradient(135deg, #22C55E, #16A34A)",
+                    color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    boxShadow: "0 4px 14px rgba(34,197,94,0.35)",
+                    transition: "opacity 0.15s",
+                    minHeight: 48,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.92")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                >
+                  Ir para pagamento
+                  <ArrowRight style={{ width: 16, height: 16 }} />
+                </button>
+                <p style={{ margin: "8px 0 0", fontSize: 10, color: "#9CA3AF", textAlign: "center" }}>
+                  Pagamento 100% seguro • Pix instantâneo
+                </p>
+              </>
+            ) : (
+              <p
+                data-testid="sidebar-checkout-hint"
+                style={{ margin: 0, fontSize: 11, color: "#6B7280", textAlign: "center", lineHeight: 1.4 }}
+              >
+                Use o botão verde ao lado para gerar o Pix e finalizar.
+              </p>
+            )}
           </>
         )}
       </div>

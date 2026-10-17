@@ -20,6 +20,7 @@ import { PixQrCodePanel } from "@/components/checkout/PixQrCodePanel";
 import { PixCopyPasteField } from "@/components/checkout/PixCopyPasteField";
 import { PixCountdown } from "@/components/checkout/PixCountdown";
 import { PaymentStatusBanner } from "@/components/checkout/PaymentStatusBanner";
+import { trackEvent } from "@/lib/analytics";
 
 type PaymentStatus =
   | "PENDING"
@@ -136,67 +137,112 @@ export default function OrderStatusPage() {
       if (showLoading) setLoading(true);
       setErrorMsg("");
 
-      const orderRes = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
-      if (!orderRes.ok) {
-        const body = (await orderRes.json().catch(() => ({}))) as {
+      // Fase 11 — BFF: 1 request no lugar de orders + status + payment details
+      const bffRes = await fetch(
+        `/api/bff/orders/${encodeURIComponent(orderId)}?view=full`,
+      );
+      if (!bffRes.ok) {
+        const body = (await bffRes.json().catch(() => ({}))) as {
           message?: string;
         };
+        trackEvent("order_bff_error", {
+          orderId,
+          status: bffRes.status,
+          message: body.message,
+        });
         throw new Error(body.message ?? "Pedido não encontrado.");
       }
 
-      const orderData = (await orderRes.json()) as OrderSummaryData;
+      const bff = (await bffRes.json()) as {
+        orderId: string;
+        status: string;
+        paid: boolean;
+        totalAmount: number;
+        originalTotal: number;
+        totalSavings: number;
+        isCombo: boolean;
+        items: Array<{
+          ticketId: string;
+          title: string;
+          quantity: number;
+          unitPrice: number;
+        }>;
+        customer: { name: string; email: string; phone?: string };
+        createdAt: string;
+        expirationDate: string;
+        secondsLeft: number;
+        demo: boolean;
+        voucherId?: string;
+        pix: {
+          copyPasteCode: string;
+          qrCodeBase64?: string;
+          hasQr: boolean;
+        } | null;
+      };
+
+      const nextStatus = normalizeStatus(bff.status);
+      const orderData: OrderSummaryData = {
+        orderId: bff.orderId,
+        status: nextStatus,
+        totalAmount: bff.totalAmount,
+        originalTotal: bff.originalTotal,
+        totalSavings: bff.totalSavings,
+        isCombo: bff.isCombo,
+        items: bff.items,
+        customer: { name: bff.customer.name, email: bff.customer.email },
+        createdAt: bff.createdAt,
+        expirationDate: bff.expirationDate,
+        demo: bff.demo,
+      };
+
       setOrder(orderData);
-      setStatus(normalizeStatus(orderData.status));
-
-      const [statusRes, detailsRes] = await Promise.all([
-        fetch(`/api/payments/tickets/${encodeURIComponent(orderId)}/status`),
-        fetch(`/api/payments/tickets/${encodeURIComponent(orderId)}`),
-      ]);
-
-      if (statusRes.ok) {
-        const statusData = (await statusRes.json()) as {
-          status?: string;
-          paid?: boolean;
-        };
-
-        const nextStatus = normalizeStatus(statusData.status ?? orderData.status);
-        setStatus(nextStatus);
-        setOrder((prev) =>
-          prev
-            ? { ...prev, status: nextStatus }
-            : { ...orderData, status: nextStatus },
-        );
+      setStatus(nextStatus);
+      setSecondsLeft(bff.secondsLeft ?? 0);
+      trackEvent("order_bff_load", {
+        orderId: bff.orderId,
+        status: nextStatus,
+        view: "full",
+        paid: bff.paid,
+      });
+      if (showLoading) {
+        trackEvent("order_status_view", {
+          orderId: bff.orderId,
+          status: nextStatus,
+        });
       }
 
-      if (detailsRes.ok) {
-        const details = (await detailsRes.json()) as TicketPaymentDetails;
-        const nextStatus = normalizeStatus(details.status);
-
-        setPaymentDetails({ ...details, status: nextStatus });
-        setStatus(nextStatus);
-
-        const expirationSource = details.expirationDate ?? orderData.expirationDate;
-        if (expirationSource) {
-          const diffSec = Math.max(
-            0,
-            Math.floor((new Date(expirationSource).getTime() - Date.now()) / 1000),
-          );
-          setSecondsLeft(diffSec);
-        }
-
-        setOrder((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: nextStatus,
-                expirationDate: details.expirationDate ?? prev.expirationDate,
-              }
-            : {
-                ...orderData,
-                status: nextStatus,
-                expirationDate: details.expirationDate ?? orderData.expirationDate,
-              },
-        );
+      if (bff.pix) {
+        setPaymentDetails({
+          transactionId: bff.orderId,
+          status: nextStatus,
+          qrCodeBase64: bff.pix.qrCodeBase64 ?? "",
+          copyPasteCode: bff.pix.copyPasteCode,
+          expirationDate: bff.expirationDate,
+          totalAmount: bff.totalAmount,
+          originalTotal: bff.originalTotal,
+          totalSavings: bff.totalSavings,
+          isCombo: bff.isCombo,
+          items: bff.items,
+          demo: bff.demo,
+          voucherId: bff.voucherId,
+          voucherToken,
+        });
+      } else {
+        setPaymentDetails({
+          transactionId: bff.orderId,
+          status: nextStatus,
+          qrCodeBase64: "",
+          copyPasteCode: "",
+          expirationDate: bff.expirationDate,
+          totalAmount: bff.totalAmount,
+          originalTotal: bff.originalTotal,
+          totalSavings: bff.totalSavings,
+          isCombo: bff.isCombo,
+          items: bff.items,
+          demo: bff.demo,
+          voucherId: bff.voucherId,
+          voucherToken,
+        });
       }
     } catch (err: unknown) {
       const message =
@@ -214,7 +260,7 @@ export default function OrderStatusPage() {
       setRefreshing(true);
 
       const statusRes = await fetch(
-        `/api/payments/tickets/${encodeURIComponent(orderId)}/status`,
+        `/api/bff/orders/${encodeURIComponent(orderId)}?view=lite`,
       );
 
       if (!statusRes.ok) return;
@@ -222,10 +268,14 @@ export default function OrderStatusPage() {
       const statusData = (await statusRes.json()) as {
         status?: string;
         paid?: boolean;
+        secondsLeft?: number;
       };
 
       const nextStatus = normalizeStatus(statusData.status);
       setStatus(nextStatus);
+      if (typeof statusData.secondsLeft === "number") {
+        setSecondsLeft(statusData.secondsLeft);
+      }
 
       setOrder((prev) =>
         prev

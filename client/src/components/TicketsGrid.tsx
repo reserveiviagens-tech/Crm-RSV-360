@@ -206,7 +206,7 @@ export function TicketsGrid({
   }
 
   return (
-    <div className="rsv-subpage-grid" style={{ padding: "20px 16px 100px" }}>
+    <div className="v13-tickets-grid" style={{ padding: "20px 16px 100px" }}>
       {tickets.map((ticket) => {
         const qty = qtyById.get(ticket.id) ?? 0
         const isBestValue = ticket.id === bestValueId
@@ -283,13 +283,42 @@ export function TicketsGrid({
               }}>
                 <AIRecommendedBadge matchPercent={matchScore} />
               </div>
-              {ticket.image && (
-                <img
-                  src={ticket.image}
-                  alt={ticket.name}
-                  style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}
-                />
-              )}
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: 200,
+                  background: "linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                {ticket.image ? (
+                  <img
+                    src={ticket.image}
+                    alt={ticket.name}
+                    style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none"
+                    }}
+                  />
+                ) : (
+                  <span
+                    style={{
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      opacity: 0.9,
+                    }}
+                  >
+                    Imperdível
+                  </span>
+                )}
+              </div>
             </div>
 
             <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
@@ -422,6 +451,7 @@ export function TicketsGrid({
                       onClick={() => onBuy(ticket)}
                       style={{
                         width: "100%", padding: "14px 0", border: "none", borderRadius: 12,
+                        minHeight: 44,
                         color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer",
                         background: ticket.popular
                           ? "linear-gradient(135deg, #22C55E, #16A34A)"
@@ -445,16 +475,17 @@ export function TicketsGrid({
                       }}
                     >
                       <button
+                        type="button"
+                        className="rsv-stepper-btn"
                         data-testid={`button-decrease-${ticket.id}`}
                         onClick={() => onDec(ticket, qty)}
                         style={{
-                          width: 34, height: 34, borderRadius: 8, border: "none",
+                          borderRadius: 10,
                           background: qty === 1 ? "#FEE2E2" : "#DCFCE7",
                           color: qty === 1 ? "#EF4444" : "#16A34A",
-                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                         }}
                       >
-                        {qty === 1 ? <Trash2 style={{ width: 15, height: 15 }} /> : <Minus style={{ width: 15, height: 15 }} />}
+                        {qty === 1 ? <Trash2 style={{ width: 16, height: 16 }} /> : <Minus style={{ width: 16, height: 16 }} />}
                       </button>
                       <span
                         style={{ fontSize: 16, fontWeight: 800, color: "#16A34A" }}
@@ -463,15 +494,16 @@ export function TicketsGrid({
                         {qty}x — {formatPrice(ticket.price * qty)}
                       </span>
                       <button
+                        type="button"
+                        className="rsv-stepper-btn"
                         data-testid={`button-increase-${ticket.id}`}
                         onClick={() => onInc(ticket, qty)}
                         style={{
-                          width: 34, height: 34, borderRadius: 8, border: "none",
+                          borderRadius: 10,
                           background: "#DCFCE7", color: "#16A34A",
-                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                         }}
                       >
-                        <Plus style={{ width: 15, height: 15 }} />
+                        <Plus style={{ width: 16, height: 16 }} />
                       </button>
                     </div>
                   )}

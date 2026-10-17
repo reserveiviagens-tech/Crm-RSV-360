@@ -1,6 +1,26 @@
 # Status Geral — RSV360
 
-  ## Última atualização: 2026-03-31
+  ## Última atualização: 2026-10-17
+
+  ## Trilha Master UI (paralela às fases de implantação)
+  | Passo | Título | Status |
+  |-------|--------|--------|
+  | A | Leis `rsv-ui-onboarding.mdc` + `.cursorrules` | ✅ |
+  | B | Fase 0 deps (`sharp`) | ✅ |
+  | C | PHASE_1 CompactContextBar | ✅ |
+  | D | PHASE_2 above-fold + Combo após 1º parque | ✅ |
+  | E | PHASE_3 V13 grid + meia-entrada + onError | ✅ |
+  | 4 | PHASE_4 Turismo Control Center (`home-sections`) | ✅ |
+  | 5 | PHASE_5 Atomic lock + hold timer (ingressos) | ✅ |
+  | 6 | PHASE_6 Laws of UX + Loopdesk (Squint/Hick) | ✅ |
+  | 7 | PHASE_7 Zeigarnik + Goal Gradient | ✅ |
+  | 8 | PHASE_8 Selection controls & hit 44px | ✅ |
+  | 9 | PHASE_9 Factory/Strategy + webhook idempotência | ✅ |
+  | 10 | PHASE_10 Idempotency-Key create Pix | ✅ |
+  | 11 | PHASE_11 BFF & payload optimization | ✅ |
+  | 12 | PHASE_12 Tracking & analytics audit | ✅ |
+  | 16 | PHASE_16 Smart Dashboard V8/V13 Turismo | ✅ |
+  | 16+ | Redis oficial + Smart Hub live + CartSticky desktop | ✅ |
 
   ## Resumo por Fase
 

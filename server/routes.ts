@@ -82,6 +82,8 @@ import {
   CONQUISTAS_DEFS as CONQUISTAS_DEFS_SERVICE,
 } from "./services/gamification-service";
 import {
+  getMarketingLabUrl,
+  isMarketingLabPublicPath,
   issueMarketingLabHandoff,
   normalizeLabReturnPath,
 } from "./services/marketing-lab-sso.service.js";
@@ -93,6 +95,16 @@ export async function registerRoutes(
   registerWeatherRoutes(app);
   registerAuctionsRoutes(app);
   registerFlashDealsRoutes(app);
+
+  // ─── S2 wizard handoff — /cotacao|/proposta|/roteiro|/h → Marketing Lab ───
+  // Docs: INTEGRACAO-HOTEIS-WIZARD-INVENTARIO.md (307 + originalUrl preserva query).
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (!isMarketingLabPublicPath(req.path)) return next();
+    const lab = getMarketingLabUrl();
+    if (!lab) return next();
+    return res.redirect(307, `${lab}${req.originalUrl}`);
+  });
 
   // ─── STATIC — Media uploads ───────────────────────────────────────────────
   const uploadsDir = path.resolve(process.cwd(), "uploads", "website");

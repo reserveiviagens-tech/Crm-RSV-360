@@ -1,6 +1,7 @@
 import { logger } from "../lib/logger.js";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:3002";
+const DEFAULT_MARKETING_LAB_URL = "http://127.0.0.1:3000";
 
 export function getRsv360BackendUrl(): string {
   return (
@@ -8,6 +9,29 @@ export function getRsv360BackendUrl(): string {
     process.env.BACKEND_API_URL ||
     DEFAULT_BACKEND_URL
   ).replace(/\/$/, "");
+}
+
+/** URL pública do site-publico / Marketing Lab (wizard /cotacao, /proposta, /roteiro). */
+export function getMarketingLabUrl(): string {
+  return (
+    process.env.MARKETING_LAB_URL ||
+    process.env.VITE_MARKETING_LAB_URL ||
+    DEFAULT_MARKETING_LAB_URL
+  ).replace(/\/$/, "");
+}
+
+/** Rotas B2C do S1 que vivem no S2 (site-publico), não no SPA Vite. */
+export function isMarketingLabPublicPath(pathname: string): boolean {
+  return (
+    pathname === "/cotacao" ||
+    pathname.startsWith("/cotacao/") ||
+    pathname === "/proposta" ||
+    pathname.startsWith("/proposta/") ||
+    pathname === "/roteiro" ||
+    pathname.startsWith("/roteiro/") ||
+    pathname === "/h" ||
+    pathname.startsWith("/h/")
+  );
 }
 
 export function getSsoBffSecret(): string {

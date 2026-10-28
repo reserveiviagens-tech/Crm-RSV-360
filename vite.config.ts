@@ -33,49 +33,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
+        // Só isola react/react-dom/scheduler. Separar RHF/TanStack/Radix em
+        // chunks próprios causa TDZ/interop: React.createContext lê undefined
+        // em produção (forms-data-vendor / createContext).
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
-
           if (
-            id.includes("/react/") ||
-            id.includes("/react-dom/") ||
-            id.includes("/scheduler/")
+            /(?:^|\/)node_modules\/(?:react|react-dom|scheduler)\//.test(
+              id.replace(/\\/g, "/"),
+            )
           ) {
             return "react-vendor";
           }
-
-          if (id.includes("/@radix-ui/")) {
-            return "radix-vendor";
-          }
-
-          if (id.includes("/leaflet/")) {
-            return "maps-vendor";
-          }
-
-          if (
-            id.includes("/recharts/") ||
-            id.includes("/d3-")
-          ) {
-            return "charts-vendor";
-          }
-
-          if (
-            id.includes("/@tanstack/") ||
-            id.includes("/react-hook-form/") ||
-            id.includes("/@hookform/") ||
-            id.includes("/zod/")
-          ) {
-            return "forms-data-vendor";
-          }
-
-          if (
-            id.includes("/lucide-react/") ||
-            id.includes("/react-icons/")
-          ) {
-            return "icons-vendor";
-          }
-
-          return "vendor";
         },
       },
     },

@@ -55,6 +55,10 @@ async function buildAll() {
     define: {
       "process.env.NODE_ENV": '"production"',
     },
+    // CJS não tem import.meta; banner evita crash se algum módulo residual ainda referenciar.
+    banner: {
+      js: 'var import_meta_url = require("url").pathToFileURL(__filename).href;',
+    },
     minify: true,
     external: externals,
     logLevel: "info",

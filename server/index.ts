@@ -1,10 +1,10 @@
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Produção: esbuild gera dist/index.cjs — import.meta.url fica vazio no formato CJS.
+// process.cwd() = WORKDIR (/app no Docker) ou raiz do projeto no npm start local.
 try {
-  process.loadEnvFile(path.resolve(__dirname, "..", ".env"));
+  process.loadEnvFile(path.resolve(process.cwd(), ".env"));
 } catch {
   // .env opcional (CI/produção injeta vars no ambiente)
 }
